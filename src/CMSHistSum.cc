@@ -526,8 +526,8 @@ RooArgList * CMSHistSum::setupBinPars(double poissonThreshold) {
 
 
   std::cout << std::string(60, '=') << "\n";
-  std::cout << "Analysing bin errors for: " << this->GetName() << "\n";
-  std::cout << "Poisson cut-off: " << poissonThreshold << "\n";
+  // std::cout << "Analysing bin errors for: " << this->GetName() << "\n";
+  // std::cout << "Poisson cut-off: " << poissonThreshold << "\n";
   std::set<unsigned> skip_idx;
   std::vector<std::string> skipped_procs;
   for (unsigned i = 0; i < vfuncstmp_.size(); ++i) {
@@ -550,8 +550,11 @@ RooArgList * CMSHistSum::setupBinPars(double poissonThreshold) {
     double sub_sum = 0.;
     double sub_err = 0.;
     // Check using a possible sub-set of bins
+    std::cout << "Entro nel loop " << vfuncstmp_.size() << std::endl;
     for (unsigned i = 0; i < vfuncstmp_.size(); ++i) {
+      std::cout << "CIAOOO idx: " << i << " to be skipped? " << skip_idx.count(i) << std::endl;
       if (skip_idx.count(i)) {
+        std::cout << "Skipping idx " << i << std::endl;
         continue;
       }
       sub_sum += vfuncstmp_[i]->cache()[j] * coeffvals_[i];
@@ -581,6 +584,11 @@ RooArgList * CMSHistSum::setupBinPars(double poissonThreshold) {
       bintypes_[j].resize(vfuncstmp_.size(), 4);
 
       for (unsigned i = 0; i < vfuncstmp_.size(); ++i) {
+        if (skip_idx.count(i))
+        {
+	   std::cout << "Skipping idx " << i << std::endl;
+           continue;
+        }
         std::string proc =
             vfuncstmp_[i]->stringAttributes().count("combine.process")
                 ? vfuncstmp_[i]->getStringAttribute("combine.process")

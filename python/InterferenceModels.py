@@ -140,6 +140,14 @@ class InterferenceModel(PhysicsModelBase_NiceSubclasses):
                 hfname = "shapeSig_{process}_{channel}_rebinPdf".format(channel=channel, process=process)
                 histfunc = self.modelBuilder.out.function(hfname)
             if not histfunc:
+                print("Sono qui " + "shapeBkg_{channel}_{process}_morph".format(channel=channel, process=process))
+                hfname = "shapeBkg_{channel}_{process}_morph".format(channel=channel, process=process)
+                histfunc = self.modelBuilder.out.function(hfname)
+                if not isinstance(histfunc, (ROOT.CMSHistFunc, ROOT.CMSHistSum)):
+                    print("Non era histfunc, cerco " + "shapeBkg_{process}_{channel}_rebinPdf".format(channel=channel, process=process) )
+                    hfname = "shapeBkg_{process}_{channel}_rebinPdf".format(channel=channel, process=process) 
+                    histfunc = self.modelBuilder.out.function(hfname)
+            if not histfunc:
                 # assume this is a CMSHistSum workspace
                 histsum_name = "prop_bin{channel}".format(channel=channel)
                 histfunc = self.modelBuilder.out.function(histsum_name)
