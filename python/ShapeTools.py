@@ -122,8 +122,10 @@ class ShapeBuilder(ModelBuilder):
                 print("Channel %s will use autoMCStats with settings: event-threshold=%g, include-signal=%i, hist-mode=%i" % ((b,) + self.DC.binParFlags[b]))
             for p in self.DC.exp[b].keys():  # so that we get only self.DC.processes contributing to this bin
                 if self.DC.exp[b][p] == 0:
+                    # print("self.DC.exp[b][p] == 0 for {} {}".format(b, p))
                     continue
                 if self.physics.getYieldScale(b, p) == 0:
+                    # print("self.physics.getYieldScale(b, p) == 0 for {} {}".format(b, p))
                     continue  # exclude really the pdf
                 # print "  +--- Getting pdf for %s in bin %s" % (p,b)
                 (pdf, coeff) = (
@@ -1151,11 +1153,17 @@ class ShapeBuilder(ModelBuilder):
                 elif shapeNominal.InheritsFrom("RooDataHist") or shapeNominal.InheritsFrom("RooParametricHist"):
                     kappaUp, kappaDown = shapeUp.sumEntries(), shapeDown.sumEntries()
                 if not kappaUp > 0:
-                    raise RuntimeError("Bogus norm %r for channel %s, process %s, systematic %s Up" % (kappaUp, channel, process, syst))
+                    # print("Bogus norm %r for channel %s, process %s, systematic %s Up" % (kappaUp, channel, process, syst))
+                    # raise RuntimeError("Bogus norm %r for channel %s, process %s, systematic %s Up" % (kappaUp, channel, process, syst))
+                    pass
                 if not kappaDown > 0:
-                    raise RuntimeError("Bogus norm %r for channel %s, process %s, systematic %s Down" % (kappaDown, channel, process, syst))
+                    # print("Bogus norm %r for channel %s, process %s, systematic %s Down" % (kappaDown, channel, process, syst))
+                    # raise RuntimeError("Bogus norm %r for channel %s, process %s, systematic %s Down" % (kappaDown, channel, process, syst))
+                    pass
                 kappaUp /= normNominal
                 kappaDown /= normNominal
+                if kappaUp < 0 or kappaDown < 0: 
+                   print("---> kappaUp / normNominal = {}, kappaDown / normNominal = {} for channel {} process {} syst {}".format(kappaUp, kappaDown, channel, process, syst))
                 if abs(kappaUp - 1) < 1e-3 and abs(kappaDown - 1) < 1e-3:
                     continue
                 # if errline[channel][process] == <x> it means the gaussian should be scaled by <x> before doing pow

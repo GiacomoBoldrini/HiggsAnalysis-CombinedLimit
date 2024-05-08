@@ -10,6 +10,7 @@ from HiggsAnalysis.CombinedLimit.PhysicsModel import PhysicsModelBase_NiceSubcla
 
 def read_scaling(path):
     if path.endswith(".json"):
+        print("reading " + path)
         with open(path) as fin:
             out = json.load(fin)
     elif path.endswith(".json.gz"):
