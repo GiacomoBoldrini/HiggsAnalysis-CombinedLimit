@@ -485,7 +485,7 @@ void CMSHistFunc::updateCache() const {
             else
             {
               mcache_[idx1].step1 = cdfMorph(idx1, x1, x2, val);
-              mcache_[idx1].step1.CropUnderflows();
+              // mcache_[idx1].step1.CropUnderflows();
               double ym = y1 + ((y2 - y1) / (x2 - x1)) * (val - x1);
               mcache_[idx1].step1.Scale(ym / integrateTemplate(mcache_[idx1].step1));
             }
@@ -608,7 +608,7 @@ void CMSHistFunc::updateCache() const {
       if (vtype_ == VerticalSetting::LogQuadLinear) {
         cache_.Exp();
       }
-      cache_.CropUnderflows();
+      // cache_.CropUnderflows();
       if (enable_fast_vertical_) fast_vertical_ = true;
 
 #if HFVERBOSE > 0

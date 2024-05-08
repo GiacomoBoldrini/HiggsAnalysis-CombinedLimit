@@ -550,7 +550,7 @@ void FastVerticalInterpHistPdfBase::syncTotal(FastTemplate &cache, const FastTem
         cache.Exp();
         //printf("Done exponential tranformation\n");  cache.Dump();
     } else {
-        cache.CropUnderflows();
+        // cache.CropUnderflows();
     }
     
     // mark as done
@@ -909,8 +909,8 @@ Double_t FastVerticalInterpHistPdf2D2::evaluate() const
 void FastVerticalInterpHistPdf2::setActiveBins(unsigned int bins) {
   assert(bins <= _cacheNominal.fullsize());
   if (_cache.size() == 0) _cache = _cacheNominal; // _cache is not persisted
-  _cache.CropUnderflows(1e-9,false);        // set all bins, also the non-active ones
-  _cacheNominal.CropUnderflows(1e-9,false); // set all bins, also the non-active ones
+  // _cache.CropUnderflows(1e-9,false);        // set all bins, also the non-active ones
+  // _cacheNominal.CropUnderflows(1e-9,false); // set all bins, also the non-active ones
   _cache.SetActiveSize(bins);
   _cacheNominal.SetActiveSize(bins);
   _cacheNominalLog.SetActiveSize(bins);
@@ -1069,7 +1069,7 @@ void FastVerticalInterpHistPdf2Base::syncTotal(FastTemplate &cache, const FastTe
         cache.Exp();
         //printf("Done exponential tranformation\n");  cache.Dump();
     } else {
-        cache.CropUnderflows();
+        // cache.CropUnderflows();
     }
     
     // mark as done

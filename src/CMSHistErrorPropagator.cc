@@ -121,7 +121,7 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
     vectorized::sqrt(valsum_.size(), &err2sum_[0], &toterr_[0]);
     cache_ = valsum_;
 
-    if (eval == 0 && bintypes_.size()) {
+    if (bintypes_.size()) {
       for (unsigned j = 0; j < valsum_.size(); ++j) {
         if (bintypes_[j][0] == 1) {
 #if HFVERBOSE > 1
@@ -184,7 +184,7 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
         }
       }
     }
-    cache_.CropUnderflows();
+    // cache_.CropUnderflows();
     binsentry_.reset();
   }
 
@@ -298,6 +298,8 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
   bintypes_.resize(valsum_.size(), std::vector<unsigned>(1, 0));
 
 
+  std::cout << "bintype size" << std::endl;
+  std::cout << bintypes_.size() << std::endl;
   std::cout << std::string(60, '=') << "\n";
   std::cout << "Analysing bin errors for: " << this->GetName() << "\n";
   std::cout << "Poisson cut-off: " << poissonThreshold << "\n";
@@ -324,6 +326,7 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
     // Check using a possible sub-set of bins
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
       if (skip_idx.count(i)) {
+        std::cout << "Skipping idx " << i << std::endl;
         continue;
       }
       sub_sum += vfuncs_[i]->cache()[j] * coeffvals_[i];
@@ -353,6 +356,13 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
       bintypes_[j].resize(vfuncs_.size(), 4);
 
       for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+
+        if (skip_idx.count(i)) {
+           std::cout << "Skipping idx " << i << std::endl;
+           bintypes_[j][i] = 4;
+           continue;
+        }
+
         std::string proc =
             vfuncs_[i]->stringAttributes().count("combine.process")
                 ? vfuncs_[i]->getStringAttribute("combine.process")
@@ -445,6 +455,10 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
         ++r;
       }
     }
+  }
+
+  for (auto& c: *res){
+     std::cout << c->GetName() << std::endl;
   }
   return res;
 }

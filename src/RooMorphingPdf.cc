@@ -188,7 +188,7 @@ Double_t RooMorphingPdf::evaluate() const {
       for (unsigned i = 0; i < p1_->cache().size(); ++i) {
         cache_[rebin_[i]] += p1_->cache()[i];
       }
-      cache_.CropUnderflows();
+      // cache_.CropUnderflows();
       cache_.Normalize();
     }
   } else {
@@ -201,7 +201,7 @@ Double_t RooMorphingPdf::evaluate() const {
       for (unsigned i = 0; i < result.size(); ++i) {
         cache_[rebin_[i]] += result[i];
       }
-      cache_.CropUnderflows();
+      // cache_.CropUnderflows();
       cache_.Normalize();
     }
   }

@@ -68,7 +68,7 @@ class FastTemplate {
         /// Applies the difference between the new and the old melds
         void DiffMeld(const FastTemplate & diff, const FastTemplate & sum, T xNew, T yNew, T xOld, T yOld) ;
         /// protect from underflows (*this = max(*this, minimum));
-        void CropUnderflows(T minimum=1e-9, bool activebinsonly=true);
+        void CropUnderflows(T minimum=-1e6, bool activebinsonly=true);
 
         /// Tell the code that only the first N bins of the template are non-empty,
         /// and so that only those have to be considered when doing operations

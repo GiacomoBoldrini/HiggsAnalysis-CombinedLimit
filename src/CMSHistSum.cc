@@ -363,7 +363,7 @@ void CMSHistSum::updateCache() const {
       if (vtype_[i] == CMSHistFunc::VerticalSetting::LogQuadLinear) {
         staging_.Exp();
       }
-      staging_.CropUnderflows();
+      // staging_.CropUnderflows();
       vectorized::mul_add(valsum_.size(), coeffvals_[i], &(staging_[0]), &valsum_[0]);
       vectorized::mul_add_sqr(valsum_.size(), coeffvals_[i], &(binerrors_[i][0]), &err2sum_[0]);
     }
@@ -411,7 +411,7 @@ void CMSHistSum::updateCache() const {
     #if HFVERBOSE > 0
       std::cout << "Done assigning bin shifts\n";
     #endif
-    cache_.CropUnderflows();
+    // cache_.CropUnderflows();
     binsentry_.reset();
   }
 }
@@ -550,6 +550,7 @@ RooArgList * CMSHistSum::setupBinPars(double poissonThreshold) {
     // Check using a possible sub-set of bins
     for (unsigned i = 0; i < vfuncstmp_.size(); ++i) {
       if (skip_idx.count(i)) {
+        std::cout << "Skipping idx " << i << std::endl;
         continue;
       }
       sub_sum += vfuncstmp_[i]->cache()[j] * coeffvals_[i];
@@ -578,7 +579,12 @@ RooArgList * CMSHistSum::setupBinPars(double poissonThreshold) {
 
       bintypes_[j].resize(vfuncstmp_.size(), 4);
 
-      for (unsigned i = 0; i < vfuncstmp_.size(); ++i) {
+      for (unsigned i = 0; i < vfuncstmp_.size(); ++i) { 
+        if (skip_idx.count(i))
+        {
+	   std::cout << "Skipping idx " << i << std::endl;
+           continue;
+        }
         std::string proc =
             vfuncstmp_[i]->stringAttributes().count("combine.process")
                 ? vfuncstmp_[i]->getStringAttribute("combine.process")
@@ -703,7 +709,7 @@ std::map<std::string, Double_t> CMSHistSum::getProcessNorms() const {
       if (vtype_[i] == CMSHistFunc::VerticalSetting::LogQuadLinear) {
         staging_.Exp();
       }
-      staging_.CropUnderflows();
+      // staging_.CropUnderflows();
 
       double const * valarray = &(staging_[0]);
       Double_t valsum = 0;
