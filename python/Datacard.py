@@ -59,6 +59,10 @@ class Datacard:
         # map of which bins should have automated Barlow-Beeston parameters
         self.binParFlags = {}
 
+        # If we have correlated MC samples we need to take into account correlations
+        # while computing MC stat unc
+        self.binParFlagsCorr = {}
+
         self.groups = {}
         self.discretes = []
 

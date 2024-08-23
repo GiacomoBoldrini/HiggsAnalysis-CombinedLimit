@@ -139,7 +139,10 @@ class CMSHistFunc : public RooAbsReal {
   };
 
   inline FastTemplate const& errors() const { return binerrors_; }
-  inline FastHisto const& cache() const { return rebin_ ? rebin_cache_ : cache_; }
+  inline FastHisto const& cache() const { 
+    // std::cout << "Returning cache for " << this->GetName() << " rebin: " << rebin_ << std::endl;
+    return rebin_ ? rebin_cache_ : cache_; 
+  }
 
   CMSHistFuncWrapper const* wrapper() const;
 

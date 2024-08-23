@@ -118,6 +118,7 @@ class ShapeBuilder(ModelBuilder):
             binconstraints = ROOT.RooArgList()
             bbb_args = None
             channelBinParFlag = b in list(self.DC.binParFlags.keys())
+            channelCorrBinParFlag = b in list(self.DC.binParFlagsCorr.keys())
             if channelBinParFlag:
                 print("Channel %s will use autoMCStats with settings: event-threshold=%g, include-signal=%i, hist-mode=%i" % ((b,) + self.DC.binParFlags[b]))
             for p in self.DC.exp[b].keys():  # so that we get only self.DC.processes contributing to this bin
@@ -191,24 +192,20 @@ class ShapeBuilder(ModelBuilder):
             if self.options.verbose > 1:
                 print("Creating RooAddPdf %s with %s elements" % ("pdf_bin" + b, coeffs.getSize()))
             if channelBinParFlag:
+                args = ("prop_bin%s" % b, "", pdfs.at(0).getXVar(), pdfs, coeffs)
+                # add correltion if present
+                if channelCorrBinParFlag: args += (self.DC.binParFlagsCorr[b])
+
                 if self.options.useCMSHistSum:
                     prop = self.addObj(
                         ROOT.CMSHistSum,
-                        "prop_bin%s" % b,
-                        "",
-                        pdfs.at(0).getXVar(),
-                        pdfs,
-                        coeffs,
+                        *args
                     )
                     prop.setAttribute("CachingPdf_NoClone", True)
                 else:
                     prop = self.addObj(
                         ROOT.CMSHistErrorPropagator,
-                        "prop_bin%s" % b,
-                        "",
-                        pdfs.at(0).getXVar(),
-                        pdfs,
-                        coeffs,
+                        *args
                     )
                 prop.setAttribute("CachingPdf_Direct", True)
                 if self.DC.binParFlags[b][0] >= 0.0:

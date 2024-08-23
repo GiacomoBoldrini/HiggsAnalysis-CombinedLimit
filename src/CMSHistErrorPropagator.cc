@@ -15,7 +15,7 @@
 #include "RooProduct.h"
 #include "vectorized.h"
 
-#define HFVERBOSE 0
+#define HFVERBOSE 5
 
 CMSHistErrorPropagator::CMSHistErrorPropagator() : initialized_(false) {}
 
@@ -66,10 +66,13 @@ void CMSHistErrorPropagator::initialize() const {
     vcoeffs_[i] = dynamic_cast<RooAbsReal const*>(coeffs_.at(i));
     auto sargs = vfuncs_[i]->getSentryArgs();
     sentry_.addVars(*sargs);
+    std::cout << vfuncs_[i]->GetName() << std::endl;
   }
   unsigned nb = vfuncs_[0]->cache().size();
+  std::cout << "Number of bins: " << nb << std::endl;
   vbinpars_.resize(nb);
   if (bintypes_.size()) {
+    std::cout << "Bin types are already defined!" << std::endl;
     for (unsigned j = 0, r = 0; j < nb; ++j) {
       vbinpars_[j].resize(bintypes_[j].size(), nullptr);
       for (unsigned i = 0; i < bintypes_[j].size(); ++i) {
@@ -80,17 +83,34 @@ void CMSHistErrorPropagator::initialize() const {
       }
     }
   }
+  // the cache of the first vfunc is an instance of type
+  // FastHisto defined in FastTemplate_Old
+  // It stores the value of a template in a smart and efficient way
   valsum_ = vfuncs_[0]->cache();
+  // we get valsum for the first pdf but then we clear it
+  // meaning setting every bin yield to zero
   valsum_.Clear();
+  // do the same again for the cache object
   cache_ = vfuncs_[0]->cache();
   cache_.Clear();
+  // this is an std vector of double initialized empty
   err2sum_.resize(nb, 0.);
+  // this is an std vector of double initialized empty
   toterr_.resize(nb, 0.);
+  // this is an std vector of std vector of double initialized empty
+  // nb -> number of bins, nf -> number of pdfs 
   binmods_.resize(nf, std::vector<double>(nb, 0.));
+  // this is an std vector of std vector of double initialized empty
+  // nb -> number of bins, nf -> number of pdfs 
   scaledbinmods_.resize(nf, std::vector<double>(nb, 0.));
+  // this is an std vector of double initialized empty
+  // each pdf has one coefficient
   coeffvals_.resize(nf, 0.);
 
+  // Add to SimpleCacheEntry the coeffs.
+  // at line 68 we already add vfuncs_[i]->getSentryArgs() to this obj
   sentry_.addVars(coeffs_);
+  // If this is the first initialization from setupBinPars then this is empty
   binsentry_.addVars(binpars_);
 
   sentry_.setValueDirty();
@@ -103,36 +123,66 @@ void CMSHistErrorPropagator::initialize() const {
 void CMSHistErrorPropagator::updateCache(int eval) const {
   initialize();
 
-#if HFVERBOSE > 0
-  std::cout << "Sentry: " << sentry_.good() << "\n";
-#endif
+// #if HFVERBOSE > 0
+//   std::cout << "Sentry: " << sentry_.good() << "\n";
+// #endif
+  // last eval -1 at construction 
   if (!sentry_.good() || eval != last_eval_) {
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+      // this calls CMSHistFunc updateCache 
       vfuncs_[i]->updateCache();
       coeffvals_[i] = vcoeffs_[i]->getVal();
     }
 
+    // clear the val sum
     valsum_.Clear();
+    // fill sumw2 vector with 0s
     std::fill(err2sum_.begin(), err2sum_.end(), 0.);
+    // cycle on number of pdfs (number of processes in a datacard bin)
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+      std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
+      std::cout << coeffvals_[i] << std::endl;
+      // valsum stores the sum of all the templates defined in this 
+      // datacard bin (cycle over the pdfs, add coeff*value to valsum)
       vectorized::mul_add(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->cache()[0]), &valsum_[0]);
+      // err2sum stores the sum in quadrature of the errors for each template defined in this
+      // datacard bin (cycle over the pdfs, add coeff^2 * error^2 to err2sum)
       vectorized::mul_add_sqr(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->errors()[0]), &err2sum_[0]);
     }
+    // take sqrt of the error quadrature sum for this datacard bin 
+    // this is the total error for the overall template in this datacard bin!!
     vectorized::sqrt(valsum_.size(), &err2sum_[0], &toterr_[0]);
+    // cache_ is a fast histo and store the overall template made from sig 
+    // and bkg summed and multiplied by their scaling coefficients or multipliers
     cache_ = valsum_;
 
+    // if we are evaluating and if bintypes is already initialized
+    // (so we are making inference of some kind)
     if (eval == 0 && bintypes_.size()) {
+      // cycle on the template bins j
       for (unsigned j = 0; j < valsum_.size(); ++j) {
+        // what is bintypes == 1?
         if (bintypes_[j][0] == 1) {
 #if HFVERBOSE > 1
           std::cout << "Bin " << j << "\n";
           printf(" | %.6f/%.6f/%.6f\n", valsum_[j], err2sum_[j], toterr_[j]);
 #endif
+          // cycle on the processes - i in this bin
           for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+            // if the overall err2 in this bin is > 0 and if this process is multplied
+            // by some factor
             if (err2sum_[j] > 0. && coeffvals_[i] > 0.) {
+              // take error e as the error for this process in this bin 
+              // and multiply it by the coefficient
               double e =  vfuncs_[i]->errors()[j] * coeffvals_[i];
+              // update binmods value for this process in this bin as 
+              // the total error (sqrt of the sum in quadrature of errors for all processes contributing to bin j)
+              // times the above error squared and divide by the total error sum squared in this bin times the 
+              // multiplicative coefficient of process i
               binmods_[i][j] = (toterr_[j] *  e * e) / (err2sum_[j] * coeffvals_[i]);
             } else {
+              // if the sum error squared in this bin is =< 0 or if the multiplicative coef is zero for process i 
+              // then set binmods to 0 for this process - i and this bin - j
               binmods_[i][j] = 0.;
             }
 #if HFVERBOSE > 1
@@ -291,6 +341,7 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
   }
 
   // First initialize all the storage
+  // not needed tbh as alreeady called in updateCache
   initialize();
   // Now fill the bin contents and errors
   updateCache(1); // the arg (1) forces updateCache to fill the caches for all bins
@@ -317,23 +368,37 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
   std::cout << std::string(60, '=') << "\n";
   std::cout << TString::Format("%-10s %-15s %-15s %-30s\n", "Bin", "Contents", "Error", "Notes");
 
+  // cycle on the bins in this datacard bin 
+  // valsum[j] is the sum of all templates defined in the datacard multiplied by their
+  // multiplicative coefficients
+  // toterr is the sqrt of the sum in quadrature of all the templates errors multiplied by their multiplicative 
+  // coefficients.
+  // There is only one valsum histo and one toterr histo per datacard bin (this->GetName())
   for (unsigned j = 0; j < valsum_.size(); ++j) {
     std::cout << TString::Format("%-10i %-15f %-15f %-30s\n", j, valsum_[j], toterr_[j], "total sum");
     double sub_sum = 0.;
     double sub_err = 0.;
-    // Check using a possible sub-set of bins
+    // Check using a possible sub-set of processes
+    // cycling on vfuncs meaning take the pdfs of the processes 
+    // contributing in this analysis bin
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+      // if we skip the process e.g. if it is a signal process then continue
       if (skip_idx.count(i)) {
         continue;
       }
+      // if not skipped compute the new corrected valsum for BB approach 
+      // by summing the bin content at bin - j multiplied by scalers
       sub_sum += vfuncs_[i]->cache()[j] * coeffvals_[i];
+      // add the error for this bin and this process in quadrature 
+      // multiplied by the scaler
       sub_err += std::pow(vfuncs_[i]->errors()[j] * coeffvals_[i], 2.);;
     }
+    // take the sqrt of the overall corrected error ignoring some processes
     sub_err = std::sqrt(sub_err);
     if (skipped_procs.size()) {
       std::cout << TString::Format("%-10i %-15f %-15f %-30s\n", j, sub_sum, sub_err, "excluding marked processes");
     }
-
+    // Don't do the splitting if the total error in this bin is zero or less
     if (sub_err <= 0.) {
       std::cout << TString::Format("  %-30s\n", "=> Error is zero, ignore");
       std::cout << std::string(60, '-') << "\n";

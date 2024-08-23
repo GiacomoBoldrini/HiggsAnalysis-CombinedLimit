@@ -14,7 +14,7 @@
 #include "vectorized.h"
 #include "TMath.h"
 
-#define HFVERBOSE 0
+#define HFVERBOSE 5
 
 bool CMSHistFunc::enable_fast_vertical_ = false;
 

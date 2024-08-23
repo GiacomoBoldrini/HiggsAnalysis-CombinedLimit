@@ -625,6 +625,29 @@ def parseCard(file, options):
                         raise RuntimeError(" No such channel '%s', malformed line:\n   %s" % (lsyst, " ".join(f)))
                     ret.binParFlags[lsyst] = statFlags
                 continue
+
+            elif pdf == "autoMCCorr":
+                
+                # ['shapes/shapes.root', 'histo_correlation_$CHANNEL']
+                corr_shape_file = str(f[2])
+                corr_shape_reg = str(f[3])
+
+                ret.binParFlagsCorr = {}
+                statCorr = (corr_shape_file, corr_shape_reg)
+
+                if "*" in lsyst:
+                    for b in ret.bins:
+                        if not fnmatch.fnmatch(b, lsyst):
+                            continue
+                        ret.binParFlagsCorr[b] = statCorr
+                else:
+                    if lsyst not in ret.bins:
+                        raise RuntimeError(" No such channel '%s', malformed line:\n   %s" % (lsyst, " ".join(f)))
+                    ret.binParFlagsCorr[lsyst] = statCorr
+
+                print(ret.binParFlagsCorr)
+                continue
+                
             else:
                 raise RuntimeError("Unsupported pdf %s" % pdf)
             if len(numbers) < len(ret.keyline):
