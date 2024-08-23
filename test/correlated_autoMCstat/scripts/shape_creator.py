@@ -228,7 +228,7 @@ from glob import glob
 
 for dir__ in directories:
     # take only the first 10 files for each mll bin
-    ls = glob(f"/eos/user/g/gboldrin/Zee_dim6_LHE/mll_binned/rootfiles/{dir__}/*")[:3]
+    ls = glob(f"/eos/user/g/gboldrin/Zee_dim6_LHE/mll_binned/rootfiles/{dir__}/*")[:1]
     for file in tqdm(ls):
         if file.split("/")[-1] == "nAOD_LHE_0.root" and dir__ == "mll_800_1000": continue
         ev__ = read_events(file, read_form=read_form)
@@ -269,7 +269,6 @@ bins = 10
 
 tdhisto, onedhistos = Fill3DHisto(events, nbins_=bins, range_= mll_bins)
 
-print("uproot")
 fname = "shapes.root"
 f = uproot.recreate(f"{fname}")
 f["histo_correlation"] = tdhisto
@@ -277,8 +276,6 @@ f["histo_sm"] = onedhistos[0]
 f["histo_w1_cQl1"] = onedhistos[1]
 f["histo_wm1_cQl1"] = onedhistos[2]
 f.close()
-
-print(tdhisto[0][0])
 
 
 
@@ -301,6 +298,58 @@ f_o.write("---------------------------------------------------------------------
 f_o.write("lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
 f_o.write("----------------------------------------------------------------------------------------------------   \n") 
 f_o.write("* autoMCStats 10 0 1   \n")
+f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation_$CHANNEL \n")
+
+f_o.close()
+
+
+
+
+# compute EFTneg shapes
+
+sm = onedhistos[0].copy()
+sm_l_q = onedhistos[1].copy()
+
+q = onedhistos[1].copy()
+
+values = (onedhistos[1].view().value + onedhistos[2].view().value - 2*onedhistos[0].view().value)*0.5
+q.view().value = values
+
+# set tp zero variances
+q.view().variance = np.zeros(len(q.view().variance))
+sm.view().variance = np.zeros(len(q.view().variance))
+sm_l_q.view().variance = np.zeros(len(q.view().variance))
+
+
+
+fname = "shapes_EFTNeg.root"
+f = uproot.recreate(f"{fname}")
+f["histo_sm"] = sm
+f["histo_sm_lin_quad_cQl1"] = sm_l_q
+f["histo_quad_cQl1"] = q
+f.close()
+
+
+# write datacard
+
+f_o = open("datacard_EFTNeg.txt", "w")
+
+f_o.write("## Shape input card\n")
+f_o.write("imax 1 number of channels\n")
+f_o.write("jmax * number of background\n")
+f_o.write("kmax * number of nuisance parameters\n")
+f_o.write("----------------------------------------------------------------------------------------------------\n")
+f_o.write("bin         inclusive_all\n")
+f_o.write(f"shapes  *           * shapes/{fname}     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC\n")
+f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all \n")                
+f_o.write("process                                                                         sm_lin_quad_cQl1                            quad_cQl1              sm   \n")                          
+f_o.write("process                                                                         0                             -1                            -2    \n")                          
+f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}\n".format(sm_l_q.sum().value, q.sum().value, sm.sum().value))          
+f_o.write("----------------------------------------------------------------------------------------------------   \n") 
+f_o.write("lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
+f_o.write("----------------------------------------------------------------------------------------------------   \n") 
+f_o.write("* autoMCStats 10 0 1   \n")
+f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation_$CHANNEL \n")
 
 f_o.close()
 

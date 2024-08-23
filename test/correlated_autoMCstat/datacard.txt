@@ -5,13 +5,12 @@ kmax * number of nuisance parameters
 ----------------------------------------------------------------------------------------------------
 bin         inclusive_all
 shapes  *           * shapes/shapes.root     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC
-correlations *      * shapes/shapes.root     histo_correlation_$CHANNEL
 bin                                                                             inclusive_all                 inclusive_all                 inclusive_all 
 process                                                                         w1_cQl1                            wm1_cQl1              sm   
 process                                                                         0                             -1                            -2    
-rate                                                                            19066.2450                        19094.0886                        19013.3366
+rate                                                                            6595.5924                        6597.9989                        6574.3383
 ----------------------------------------------------------------------------------------------------   
 lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     
 ----------------------------------------------------------------------------------------------------   
-* autoMCStats 10 0 1 
-* autoMCCorr  shapes/shapes.root     histo_correlation_$CHANNEL
+* autoMCStats 10 0 1   
+* autoMCCorr shapes/shapes.root   histo_correlation 

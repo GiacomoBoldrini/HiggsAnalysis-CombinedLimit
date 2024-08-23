@@ -37,6 +37,31 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(const char* name,
   coeffs_.add(coeffs);
 }
 
+// allow to pass correlation histogram
+CMSHistErrorPropagator::CMSHistErrorPropagator(const char* name,
+                                               const char* title,
+                                               RooRealVar& x,
+                                               RooArgList const& funcs,
+                                               RooArgList const& coeffs,
+                                               TH3 const& mccorr
+                                               )
+    : RooAbsReal(name, title),
+      x_("x", "", this, x),
+      funcs_("funcs", "", this),
+      coeffs_("coeffs", "", this),
+      binpars_("binpars", "", this),
+      mccorr_(mccorr),
+      sentry_(TString(name) + "_sentry", ""),
+      binsentry_(TString(name) + "_binsentry", ""),
+      initialized_(false),
+      last_eval_(-1){
+  funcs_.add(funcs);
+  coeffs_.add(coeffs);
+
+  //let's se if we initialize the thing correctly
+  mccorr_.Dump();
+}
+
 CMSHistErrorPropagator::CMSHistErrorPropagator(
     CMSHistErrorPropagator const& other, const char* name)
     : RooAbsReal(other, name),
@@ -123,6 +148,11 @@ void CMSHistErrorPropagator::initialize() const {
 void CMSHistErrorPropagator::updateCache(int eval) const {
   initialize();
 
+  #if HFVERBOSE > 0
+    std::cout << "Update Cache of CMSHistErrorPropagator" << std::endl;
+  #endif
+
+
 // #if HFVERBOSE > 0
 //   std::cout << "Sentry: " << sentry_.good() << "\n";
 // #endif
@@ -140,8 +170,17 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
     std::fill(err2sum_.begin(), err2sum_.end(), 0.);
     // cycle on number of pdfs (number of processes in a datacard bin)
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
-      std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
-      std::cout << coeffvals_[i] << std::endl;
+
+      //  here coeffvals_ is the value of the multiplicative factor on the template 
+      //  times log normal times shape unc and so on
+      //  if the EFT template has no lnN or shape associated then this is the W.C. scaling
+      //  (1-k**2) for SM, 0.5*k*(k+1) for SM+Li+Qi and 0.5*k*(k-1) for SM-Li+Qi.
+      //  I guess we want to include other normalization scaling in the factor also when 
+      //  computing the error...
+
+      //      std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
+      //      std::cout << vcoeffs_[i]->GetName() << std::endl;
+      //      std::cout << vcoeffs_[i]->getVal() << std::endl;
       // valsum stores the sum of all the templates defined in this 
       // datacard bin (cycle over the pdfs, add coeff*value to valsum)
       vectorized::mul_add(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->cache()[0]), &valsum_[0]);

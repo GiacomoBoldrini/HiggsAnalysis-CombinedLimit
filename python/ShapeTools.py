@@ -193,8 +193,10 @@ class ShapeBuilder(ModelBuilder):
                 print("Creating RooAddPdf %s with %s elements" % ("pdf_bin" + b, coeffs.getSize()))
             if channelBinParFlag:
                 args = ("prop_bin%s" % b, "", pdfs.at(0).getXVar(), pdfs, coeffs)
-                # add correltion if present
-                if channelCorrBinParFlag: args += (self.DC.binParFlagsCorr[b])
+                # add correlation if present
+                if channelCorrBinParFlag: 
+                    correrlation_matrix = self.getCorrMatrix(b)
+                    args += (correrlation_matrix,)
 
                 if self.options.useCMSHistSum:
                     prop = self.addObj(
@@ -657,6 +659,38 @@ class ShapeBuilder(ModelBuilder):
     ## -------------------------------------
     ## -------- Low level helpers ----------
     ## -------------------------------------
+    def getCorrMatrix(self, channel, _cache={}):
+
+        # we have one correlation map for datacard bin
+        # we expect something like
+        # * autoMCCorr <file_path>  histo_correlation_$CHANNEL
+        # binParFlagsCorr is {channel: [file_path, pattern]}
+
+        bentry = None
+        useStar = False
+        if channel in self.DC.binParFlagsCorr:
+            bentry = self.DC.binParFlagsCorr[channel]
+        elif "*" in self.DC.binParFlagsCorr:
+            bentry = self.DC.binParFlagsCorr["*"]
+            useStar = True
+
+        file = self._fileCache[bentry[0]]
+        objname = bentry[1].replace("$CHANNEL", channel)
+
+        if not file:
+            raise RuntimeError("Cannot open file %s" % (bentry[0]))
+
+        ret = file.Get(objname)
+        if not ret:
+            raise RuntimeError("Failed to find %s in file %s" % (objname, bentry[0]))
+
+        ret.SetName("shape%s_%s_autoMCstatCorr" % (objname, "all" if useStar else channel))
+        if self.options.verbose > 2:
+            print("import (%s,%s) -> %s\n" % (bentry[0], objname, ret.GetName()))
+        _cache[ret.GetName()] = ret
+        return ret
+
+
     def getShape(self, channel, process, syst="", _cache={}, allowNoSyst=False):
         if (channel, process, syst) in _cache:
             if self.options.verbose > 2:
@@ -850,10 +884,13 @@ class ShapeBuilder(ModelBuilder):
         return self.shape2Data(self.getShape(channel, process, syst), channel, process)
 
     def getPdf(self, channel, process, _cache={}):
+        print("---> Sono in getPdf")
         postFix = "Sig" if (process in self.DC.isSignal and self.DC.isSignal[process]) else "Bkg"
         if (channel, process) in _cache:
             return _cache[(channel, process)]
+        print(f"--> Retrieve nominal shape for {channel}, {process}")
         shapeNominal = self.getShape(channel, process)
+        print(f"--> Convert nominal shape {shapeNominal} in pdf for {channel}, {process}")
         nominalPdf = self.shape2Pdf(shapeNominal, channel, process) if (self.options.useHistPdf == "always" or shapeNominal == None) else shapeNominal
         if shapeNominal == None:
             return nominalPdf  # no point morphing a fake shape
@@ -1244,6 +1281,7 @@ class ShapeBuilder(ModelBuilder):
         return _cache[shape.GetName()]
 
     def shape2Pdf(self, shape, channel, process, _cache={}):
+        print(f"---> Sono in shape2Pdf channel: {channel} process: {process} shape: {shape}")
         postFix = "Sig" if (process in self.DC.isSignal and self.DC.isSignal[process]) else "Bkg"
         channelBinParFlag = channel in list(self.DC.binParFlags.keys())
         if shape == None:

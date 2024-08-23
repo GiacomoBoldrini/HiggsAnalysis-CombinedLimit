@@ -39,6 +39,9 @@ public:
   CMSHistErrorPropagator(const char* name, const char* title, RooRealVar& x,
                          RooArgList const& funcs, RooArgList const& coeffs);
 
+  CMSHistErrorPropagator(const char* name, const char* title, RooRealVar& x,
+                         RooArgList const& funcs, RooArgList const& coeffs, TH3 const& mccorr);
+
   CMSHistErrorPropagator(CMSHistErrorPropagator const& other, const char* name = 0);
 
   TObject* clone(const char* newname) const override {
@@ -82,6 +85,7 @@ public:
   RooListProxy funcs_;
   RooListProxy coeffs_;
   RooListProxy binpars_;
+  FastHisto3D mccorr_; // not mutable, this is fixed
   mutable std::vector<CMSHistFunc const*> vfuncs_; //!
   mutable std::vector<RooAbsReal const*> vcoeffs_; //!
   mutable std::vector<std::vector<RooAbsReal *>> vbinpars_; //!
