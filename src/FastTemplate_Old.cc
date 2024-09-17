@@ -246,6 +246,10 @@ FastHisto3D::FastHisto3D(const FastHisto3D &other) :
 {
 }
 
+FastHisto3D::T FastHisto3D::Get(const T &ix, const T &iy, const T &iz) const {
+    return values_[ix * binY_ *binZ_ +binZ_*iy + iz];
+}
+
 FastHisto3D::T FastHisto3D::GetAt(const T &x, const T &y, const T &z) const {
     auto matchx = std::lower_bound(binEdgesX_.begin(), binEdgesX_.end(), x);
     if (matchx == binEdgesX_.begin() || matchx == binEdgesX_.end()) return T(0.0);

@@ -4,13 +4,13 @@ jmax * number of background
 kmax * number of nuisance parameters
 ----------------------------------------------------------------------------------------------------
 bin         inclusive_all
-shapes  *           * shapes/shapes_EFTNeg.root     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC
+shapes  *           * shapes/shapes_10.root     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC
 bin                                                                             inclusive_all                 inclusive_all                 inclusive_all 
-process                                                                         sm_lin_quad_cQl1                            quad_cQl1              sm   
+process                                                                         w1_cQl1                            wm1_cQl1              sm   
 process                                                                         0                             -1                            -2    
-rate                                                                            1061.9281                        419.1488                        694.1672
+rate                                                                            1061.9281                        1164.7039                        694.1672
 ----------------------------------------------------------------------------------------------------   
 ## lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     
 ----------------------------------------------------------------------------------------------------   
 * autoMCStats 0 1 1   
-* autoMCCorr shapes/shapes_EFTNeg.root   histo_correlation 
+* autoMCCorr shapes/shapes_10.root   histo_correlation 

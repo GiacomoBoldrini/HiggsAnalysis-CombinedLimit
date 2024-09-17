@@ -15,7 +15,7 @@
 #include "RooProduct.h"
 #include "vectorized.h"
 
-#define HFVERBOSE 5
+#define HFVERBOSE 0
 
 CMSHistErrorPropagator::CMSHistErrorPropagator() : initialized_(false) {}
 
@@ -43,23 +43,36 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(const char* name,
                                                RooRealVar& x,
                                                RooArgList const& funcs,
                                                RooArgList const& coeffs,
-                                               TH3 const& mccorr
+                                               TH3 const& hist
                                                )
     : RooAbsReal(name, title),
       x_("x", "", this, x),
       funcs_("funcs", "", this),
       coeffs_("coeffs", "", this),
       binpars_("binpars", "", this),
-      mccorr_(mccorr),
+      mccorr_(hist),
       sentry_(TString(name) + "_sentry", ""),
       binsentry_(TString(name) + "_binsentry", ""),
       initialized_(false),
-      last_eval_(-1){
+      last_eval_(-1) {
+
   funcs_.add(funcs);
   coeffs_.add(coeffs);
 
-  //let's se if we initialize the thing correctly
   mccorr_.Dump();
+
+  // save bin labels as they are not included in the 
+  // FastTemplate3D implementation.. maybe we need a cutom object
+
+  unsigned ncf = hist.GetNbinsY();
+  std::cout << "-----" << std::endl;
+  std::cout << "NBins" << ncf <<std::endl;
+  for (unsigned i = 0; i < ncf; ++i) {
+    std::string bin_label = std::string(hist.GetYaxis()->GetBinLabel(i+1));
+    corrsamples_[i] = bin_label;
+    //auto proc = vfuncs_[i]->getStringAttribute("combine.process");
+  }
+  
 }
 
 CMSHistErrorPropagator::CMSHistErrorPropagator(
@@ -69,6 +82,8 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(
       funcs_("funcs", this, other.funcs_),
       coeffs_("coeffs", this, other.coeffs_),
       binpars_("binpars", this, other.binpars_),
+      mccorr_(other.mccorr_),
+      corrsamples_(other.corrsamples_),
       bintypes_(other.bintypes_),
       sentry_(name ? TString(name) + "_sentry" : TString(other.GetName())+"_sentry", ""),
       binsentry_(name ? TString(name) + "_binsentry" : TString(other.GetName())+"_binsentry", ""),
@@ -76,7 +91,10 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(
       last_eval_(-1) {
 }
 
+
+
 void CMSHistErrorPropagator::initialize() const {
+
   if (initialized_) return;
   sentry_.SetName(TString(this->GetName()) + "_sentry");
   binsentry_.SetName(TString(this->GetName()) + "_binsentry");
@@ -108,6 +126,26 @@ void CMSHistErrorPropagator::initialize() const {
       }
     }
   }
+
+  // basic things on correlations
+  // find the samples names that originate from the same sample
+
+  // // not all samples from vfuncs will be correlated, need o search
+  // unsigned ncf = mccorr_.GetNbinsY();
+  // corrsamples_.resize(ncf);
+  // for (unsigned i = 0; i < ncf; ++i) {
+  //   corrsamples_[i] = mccorr_.GetYaxis()->GetBinLabel(i+1);
+  //   //auto proc = vfuncs_[i]->getStringAttribute("combine.process");
+  // }
+
+#if HFVERBOSE > 0
+  std::cout << " -- MC correlation --" << std::endl;
+  std::cout << "sample   binidx" << std::endl;
+  for (auto it = corrsamples_.begin(); it != corrsamples_.end(); it++){
+      std::cout << it->first  << "   " <<  it->second << std::endl;
+  }
+#endif
+  
   // the cache of the first vfunc is an instance of type
   // FastHisto defined in FastTemplate_Old
   // It stores the value of a template in a smart and efficient way
@@ -120,6 +158,8 @@ void CMSHistErrorPropagator::initialize() const {
   cache_.Clear();
   // this is an std vector of double initialized empty
   err2sum_.resize(nb, 0.);
+  // this is an std vector of double initialized empty
+  err2sumcorr_.resize(nb, 0.);
   // this is an std vector of double initialized empty
   toterr_.resize(nb, 0.);
   // this is an std vector of std vector of double initialized empty
@@ -168,8 +208,22 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
     valsum_.Clear();
     // fill sumw2 vector with 0s
     std::fill(err2sum_.begin(), err2sum_.end(), 0.);
+    std::fill(err2sumcorr_.begin(), err2sumcorr_.end(), 0.);
     // cycle on number of pdfs (number of processes in a datacard bin)
+
+    // store in a map the correlated sample name and its index in the 
+    // vfuncs_ and coeffvals_ vectors 
+    std::map<std::string, unsigned int> corrsamples_index_;
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+
+      // // std::cout << vfuncs_[i]->getStringAttribute("combine.process") << std::endl;
+      // for (auto c: corrsamples_) { std::cout << c << std::endl;}
+
+      
+      // auto proc = vfuncs_[i]->getStringAttribute("combine.process");
+      // unsigned bin = mccorr_.GetYaxis()->FindBin(proc);
+
+      // std::cout << proc << " " << bin << std::endl;
 
       //  here coeffvals_ is the value of the multiplicative factor on the template 
       //  times log normal times shape unc and so on
@@ -186,23 +240,96 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       vectorized::mul_add(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->cache()[0]), &valsum_[0]);
       // err2sum stores the sum in quadrature of the errors for each template defined in this
       // datacard bin (cycle over the pdfs, add coeff^2 * error^2 to err2sum)
+
+      // if this is a correlated sample, do not sum errors in quadrature
+      auto samplename = vfuncs_[i]->getStringAttribute("combine.process");
+      if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [samplename](const auto& mo) {return mo.second == samplename; }) != std::end(corrsamples_)){
+// #if HFVERBOSE > 0
+//         std::cout << " Skipping process " << vfuncs_[i]->getStringAttribute("combine.process") << " in err2sum" << std::endl;
+//         std::cout << "---- ERRORS ----" << std::endl;
+//         auto pp = &(vfuncs_[i]->errors()[0]);
+//         for (uint32_t i = 0; i < valsum_.size(); ++i) {
+//             std::cout << pp[i] << std::endl;
+//         } 
+// #endif
+        corrsamples_index_[samplename] = i;
+        continue;
+      }
+
       vectorized::mul_add_sqr(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->errors()[0]), &err2sum_[0]);
     }
+
+
+    // after the loop on uncorrelated samples, we compute the 
+    // overall error on the correlated ones. We compute it here for simplicity
+
+    // we need to compute c^T sigma c where c is the vector of the coefficients
+    // and sigma is the correlation matrix stored at a specific bin 
+    for (unsigned int bin_idx = 0; bin_idx < valsum_.size(); ++bin_idx){
+      std::vector<double> first_mult(mccorr_.binY(), 0);
+      // cycle on correlation matrix bins first in x and then in y
+      // make first multiplication
+      for (unsigned int i = 0; i < mccorr_.binY(); ++i){
+        for (unsigned int j = 0; j < mccorr_.binZ(); ++j){
+          // rwo times column product 
+          auto xsample = corrsamples_[i];
+          auto ysample = corrsamples_[j];
+          auto xsidx = corrsamples_index_[xsample]; 
+          auto ysidx = corrsamples_index_[ysample]; 
+
+          // std::cout << xsample << " " << ysample << std::endl;
+          // std::cout << vfuncs_[xsidx]->errors()[bin_idx] << " " << " " <<  vfuncs_[ysidx]->errors()[bin_idx]<< " " << mccorr_.Get(bin_idx, i, j)<< " " << coeffvals_[ysidx] << std::endl;
+          // std::cout << "Factor " << mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx] << std::endl;
+          first_mult[i] +=  mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
+          // first_mult[i] +=  vfuncs_[xsidx]->errors()[bin_idx] *   vfuncs_[ysidx]->errors()[bin_idx] * mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
+        }
+      }
+
+      // now make second multiplication and store the result
+      for (unsigned int i = 0; i < mccorr_.binY(); ++i){
+         err2sumcorr_[bin_idx] += first_mult[i]*coeffvals_[corrsamples_index_[corrsamples_[i]]];
+      }
+      
+    }
+    
+#if HFVERBOSE > 0
+    for (unsigned int i =0 ; i < valsum_.size(); ++i){
+        std::cout << "Correlated error at bin " << i << "   " << err2sumcorr_[i] <<std::endl;
+    }
+#endif
+
+    // add correlated error squared to errors squared 
+    vectorized::mul_add(valsum_.size(), 1, &(err2sumcorr_[0]), &err2sum_[0]);
+
+
     // take sqrt of the error quadrature sum for this datacard bin 
     // this is the total error for the overall template in this datacard bin!!
     vectorized::sqrt(valsum_.size(), &err2sum_[0], &toterr_[0]);
+
+    // ---- TO BE REMOVED -----
+    for (unsigned int i = 0; i < valsum_.size(); ++i ){ toterr_[i] = toterr_[i]*1; }
+    // 
+
+#if HFVERBOSE > 0
+    for (unsigned int i =0 ; i < valsum_.size(); ++i){
+        std::cout << "Overall error at bin " << i << "   " << toterr_[i] <<std::endl;
+    }
+#endif
+
     // cache_ is a fast histo and store the overall template made from sig 
     // and bkg summed and multiplied by their scaling coefficients or multipliers
     cache_ = valsum_;
 
     // if we are evaluating and if bintypes is already initialized
     // (so we are making inference of some kind)
+    // std::cout << "eval=" << eval << std::endl;
     if (eval == 0 && bintypes_.size()) {
       // cycle on the template bins j
       for (unsigned j = 0; j < valsum_.size(); ++j) {
         // what is bintypes == 1?
         if (bintypes_[j][0] == 1) {
 #if HFVERBOSE > 1
+          std::cout<< "SONO QUI" << std::endl;
           std::cout << "Bin " << j << "\n";
           printf(" | %.6f/%.6f/%.6f\n", valsum_[j], err2sum_[j], toterr_[j]);
 #endif
@@ -541,6 +668,8 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
   }
 
   // binpars_.add(*res);
+  // std::cout << "Adding binpars_ " << std::endl;
+  // binpars_.print(true);
   binsentry_.addVars(binpars_);
   binsentry_.setValueDirty();
 

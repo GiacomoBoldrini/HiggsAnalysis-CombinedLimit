@@ -57,6 +57,9 @@ if DC.hasShapes:
 else:
     MB = CountingModelBuilder(DC, options)
 
+print(DC.systs)
+sys.exit(0)
+
 # Let's initialize the ShapeBuilder routine
 # With AnalyticalAnomalousCoupling
 

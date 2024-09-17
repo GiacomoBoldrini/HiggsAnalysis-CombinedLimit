@@ -1,5 +1,7 @@
 #include "vectorized.h"
+#include "TH3D.h"
 #include "../interface/Accumulators.h"
+
 
 void vectorized::mul_add(const uint32_t size, double coeff, double const * __restrict__ iarray, double* __restrict__ oarray) {
     for (uint32_t i = 0; i < size; ++i) {
@@ -13,6 +15,13 @@ void vectorized::mul_add_sqr(const uint32_t size, double coeff, double const * _
     } 
 }
 
+/*
+void vectorized::mul_add_sqr_corr(const uint32_t size, double coeff, double const * __restrict__ iarray, double* __restrict__ oarray) {
+    for (uint32_t i = 0; i < size; ++i) {
+        oarray[i] += (coeff * coeff * iarray[i] * iarray[i]);
+    } 
+}
+*/
 void vectorized::mul_inplace(const uint32_t size, double const * __restrict__ iarray, double* __restrict__ oarray) {
     for (uint32_t i = 0; i < size; ++i) {
         oarray[i] *= iarray[i];

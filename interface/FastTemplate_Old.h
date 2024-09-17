@@ -212,6 +212,7 @@ class FastHisto3D : public FastTemplate {
             std::swap(binEdgesZ_, other.binEdgesZ_);
         }
         T GetAt(const T &x, const T &y, const T &z) const ;
+        T Get(const T &ix, const T &iy, const T &iz) const ;
         T IntegralWidth() const ;
         unsigned int binX() const { return binX_; }
         unsigned int binY() const { return binY_; }

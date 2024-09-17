@@ -8,9 +8,9 @@ shapes  *           * shapes/shapes.root     histo_$PROCESS histo_$PROCESS_$SYST
 bin                                                                             inclusive_all                 inclusive_all                 inclusive_all 
 process                                                                         w1_cQl1                            wm1_cQl1              sm   
 process                                                                         0                             -1                            -2    
-rate                                                                            6595.5924                        6597.9989                        6574.3383
+rate                                                                            1061.9281                        1164.7039                        694.1672
 ----------------------------------------------------------------------------------------------------   
 lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     
 ----------------------------------------------------------------------------------------------------   
 * autoMCStats 10 0 1   
-* autoMCCorr shapes/shapes.root   histo_correlation 
+* autoMCCorr shapes/shapes.root   histo_correlation_$CHANNEL 

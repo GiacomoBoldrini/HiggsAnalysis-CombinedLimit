@@ -17,7 +17,117 @@ mpl.use("Agg")
 plt.style.use(hep.style.CMS)  # or ATLAS/LHCb2
 mpl.use("Agg")
 
-def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000]):
+def plot(events, scale=1):
+
+
+
+    mll_bins = (0, 2000)
+    ptl_bins = (100, 600)
+    bins = 10
+
+
+
+    # fill the axes
+    h_mll = Hist(
+        hist.axis.Regular(
+            bins, *mll_bins, name="mll", label="mll [GeV]", underflow=False, overflow=False
+        ),
+        hist.storage.Weight()
+    )
+
+    h_ptl = Hist(
+        hist.axis.Regular(
+            bins, *ptl_bins,  name="ptl1", label="ptl1 [GeV]", underflow=False, overflow=False
+        ),
+        hist.storage.Weight()
+    )
+
+    ##########
+
+    h_mll_cQl1 = Hist(
+        hist.axis.Regular(
+            bins, *mll_bins, name="mll_cQl1", label="mll [GeV]", underflow=False, overflow=False
+        ),
+        hist.storage.Weight()
+    )
+
+    h_ptl_cQl1 = Hist(
+        hist.axis.Regular(
+            bins, *ptl_bins,  name="ptl1_cQl1", label="ptl1 [GeV]", underflow=False, overflow=False
+        ),
+        hist.storage.Weight()
+    )
+
+    ##########
+
+    h_mll_mcQl1 = Hist(
+        hist.axis.Regular(
+            bins, *mll_bins, name="mll_mcQl1", label="mll [GeV]", underflow=False, overflow=False
+        ),
+        hist.storage.Weight()
+    )
+
+    h_ptl_mcQl1 = Hist(
+        hist.axis.Regular(
+            bins, *ptl_bins,  name="ptl1_mcQl1", label="ptl1 [GeV]", underflow=False, overflow=False
+        ),
+        hist.storage.Weight()
+    )
+
+
+
+    h_mll.fill(events.mll, weight=events.LHEReweightingWeight[:,0]*scale)
+    h_ptl.fill(events.ptl1, weight=events.LHEReweightingWeight[:,0]*scale)
+
+    h_mll_cQl1.fill(events.mll, weight=events.LHEReweightingWeight[:,40]*scale)
+    h_ptl_cQl1.fill(events.ptl1, weight=events.LHEReweightingWeight[:,40]*scale)
+
+    h_mll_mcQl1.fill(events.mll, weight=events.LHEReweightingWeight[:,39]*scale)
+    h_ptl_mcQl1.fill(events.ptl1, weight=events.LHEReweightingWeight[:,39]*scale)
+
+    h_mll.view().value = h_mll.view().value/scale
+    h_ptl.view().value = h_ptl.view().value/scale
+    h_mll_cQl1.view().value = h_mll_cQl1.view().value/scale
+    h_ptl_cQl1.view().value = h_ptl_cQl1.view().value/scale
+    h_mll_mcQl1.view().value = h_mll_mcQl1.view().value/scale
+    h_ptl_mcQl1.view().value = h_ptl_mcQl1.view().value/scale
+
+
+    fig, ax = plt.subplots(1,2, figsize=(20,10), dpi=160)
+    # h_mll.plot(ax=ax[0], w2method="sqrt", label="cQl1=0 (SM)")
+
+    h_mll_cQl1.plot(ax=ax[0], w2method="sqrt", color='green', label="cQl1=1")
+    #h_mll_mcQl1.plot(ax=ax[0], w2method="sqrt", color='black', label="cQl1=-1")
+
+    ax[0].legend()
+    hep.cms.label(
+            "Preliminary", data=True, ax=ax[0]
+        )  # ,fontsize=16)
+
+    # h_ptl.plot(ax=ax[1], w2method="sqrt", label="cQl1=0 (SM)")
+    h_ptl_cQl1.plot(ax=ax[1], w2method="sqrt", color='green', label="cQl1=1")
+    #h_ptl_mcQl1.plot(ax=ax[1], w2method="sqrt", color='black', label="cQl1=-1")
+
+    ax[1].legend()
+
+    hep.cms.label(
+            "Preliminary", data=True, ax=ax[1]
+        )  # ,fontsize=16)
+
+    ax[0].set_ylabel("Events")
+    ax[1].set_ylabel("Events")
+
+    ax[0].set_yscale("log")
+    ax[1].set_yscale("log")
+    fig.tight_layout()
+
+    fig.savefig(f"./plots/mll_ptll_{scale}.pdf")
+    fig.savefig(f"./plots/mll_ptll_{scale}.png")
+
+    return
+
+
+def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000], scale=1):
     
     # the three histos we need for morphin into sm lin quad
     #h_w0 = ROOT.TH1F("h_w0", "h_w0", nbins_, *range_)
@@ -30,6 +140,14 @@ def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000]):
              np.linspace(0, 3, 3+1),
              np.linspace(0, 3, 3+1),
             ]
+    
+    samples = ["sm", "w1_cQl1", "wm1_cQl1"]
+
+    h = Hist(
+        hist.axis.Regular(nbins_, 0, 2000),
+        hist.axis.StrCategory(samples),
+        hist.axis.StrCategory(samples),
+    )
     
     # single histos for dc and root file
     
@@ -48,9 +166,14 @@ def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000]):
         storage=hist.storage.Weight()
     )
 
-    h_w0.fill(events[var_], weight=events.baseW*events.LHEReweightingWeight[:,0])
-    h_w1.fill(events[var_], weight=events.baseW*events.LHEReweightingWeight[:,40])
-    h_wm1.fill(events[var_], weight=events.baseW*events.LHEReweightingWeight[:,39])
+    h_w0.fill(events[var_], weight=events.LHEReweightingWeight[:,0]*scale)
+    h_w1.fill(events[var_], weight=events.LHEReweightingWeight[:,40]*scale)
+    h_wm1.fill(events[var_], weight=events.LHEReweightingWeight[:,39]*scale)
+
+    # normalize back the histos
+    h_w0.view().value = h_w0.view().value / scale
+    h_w1.view().value = h_w1.view().value / scale
+    h_wm1.view().value = h_wm1.view().value / scale
     
     
     
@@ -81,25 +204,32 @@ def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000]):
         #retrieve weights for morphing 
         # for events falling in this bin
         
-        #cQl1
-        w0 = ev__.baseW*ev__.LHEReweightingWeight[:,0]
-        w1 = ev__.baseW*ev__.LHEReweightingWeight[:,22]
-        wm1 = ev__.baseW*ev__.LHEReweightingWeight[:,21]
+        w0 = ev__.LHEReweightingWeight[:,0] * scale
+        w1 = ev__.LHEReweightingWeight[:,40] * scale
+        wm1 = ev__.LHEReweightingWeight[:,39] * scale
         
-        s_AB = ak.corr(w0, w1)
-        s_AC = ak.corr(w0, wm1)
-        s_BC = ak.corr(w1, wm1)
-
+        s_AA = ak.sum(w0**2)
+        s_BB = ak.sum(w1**2)
+        s_CC = ak.sum(wm1**2)
+        
+        
+        s_AB = 2*ak.corr(w0, w1)*np.sqrt(s_AA)*np.sqrt(s_BB)
+        s_AC = 2*ak.corr(w0, wm1)*np.sqrt(s_AA)*np.sqrt(s_CC)
+        s_BC = 2*ak.corr(w1, wm1)*np.sqrt(s_BB)*np.sqrt(s_CC)
         
         # this should appear in top left
-        td[b_,0,0] = 1.0
-        td[b_,0,1] = s_AB
-        td[b_,0,2] = s_AC
-        td[b_,1,2] = s_BC
+        h[b_,0,0] = s_AA
+        h[b_,0,1] = s_AB
+        h[b_,0,2] = s_AC
+        h[b_,1,1] = s_BB
+        h[b_,1,2] = s_BC
+        h[b_,2,2] = s_CC
+
+        print(s_AA, s_AB, s_AC, s_BB, s_BC, s_CC)
         
     
         
-    return (td, edges), (h_w0, h_w1, h_wm1)
+    return h, (h_w0, h_w1, h_wm1)
         
         
 
@@ -262,50 +392,54 @@ events['ptl1'] = (events.Muons[:,0]).pt
 print("Number of events {}".format(len(events)))
 
 
-# make datacards and shapes for the cQl1 operator
+for scale in [1, 2, 5, 10]:
+    plot(events, scale=scale)
+    # make datacards and shapes for the cQl1 operator
 
-mll_bins = (0, 2000)
-bins = 10
+    mll_bins = (0, 2000)
+    bins = 1
 
-tdhisto, onedhistos = Fill3DHisto(events, nbins_=bins, range_= mll_bins)
+    tdhisto, onedhistos = Fill3DHisto(events, nbins_=bins, range_= mll_bins, scale=scale)
 
-fname = "shapes.root"
-f = uproot.recreate(f"{fname}")
-f["histo_correlation"] = tdhisto
-f["histo_sm"] = onedhistos[0]
-f["histo_w1_cQl1"] = onedhistos[1]
-f["histo_wm1_cQl1"] = onedhistos[2]
-f.close()
+    fname = f"shapes_{scale}.root"
+    f = uproot.recreate(f"{fname}")
+    f["histo_correlation"] = tdhisto
+    f["histo_sm"] = onedhistos[0]
+    f["histo_w1_cQl1"] = onedhistos[1]
+    f["histo_wm1_cQl1"] = onedhistos[2]
+    f.close()
 
 
 
-# write datacard
+    # write datacard
 
-f_o = open("datacard.txt", "w")
+    f_o = open(f"datacard_{scale}.txt", "w")
 
-f_o.write("## Shape input card\n")
-f_o.write("imax 1 number of channels\n")
-f_o.write("jmax * number of background\n")
-f_o.write("kmax * number of nuisance parameters\n")
-f_o.write("----------------------------------------------------------------------------------------------------\n")
-f_o.write("bin         inclusive_all\n")
-f_o.write(f"shapes  *           * shapes/{fname}     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC\n")
-f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all \n")                
-f_o.write("process                                                                         w1_cQl1                            wm1_cQl1              sm   \n")                          
-f_o.write("process                                                                         0                             -1                            -2    \n")                          
-f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}\n".format(onedhistos[1].sum().value, onedhistos[2].sum().value, onedhistos[0].sum().value))          
-f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-f_o.write("lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
-f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-f_o.write("* autoMCStats 10 0 1   \n")
-f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation_$CHANNEL \n")
+    f_o.write("## Shape input card\n")
+    f_o.write("imax 1 number of channels\n")
+    f_o.write("jmax * number of background\n")
+    f_o.write("kmax * number of nuisance parameters\n")
+    f_o.write("----------------------------------------------------------------------------------------------------\n")
+    f_o.write("bin         inclusive_all\n")
+    f_o.write(f"shapes  *           * shapes/{fname}     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC\n")
+    f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all \n")                
+    f_o.write("process                                                                         w1_cQl1                            wm1_cQl1              sm   \n")                          
+    f_o.write("process                                                                         0                             -1                            -2    \n")                          
+    f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}\n".format(onedhistos[1].sum().value, onedhistos[2].sum().value, onedhistos[0].sum().value))          
+    f_o.write("----------------------------------------------------------------------------------------------------   \n") 
+    f_o.write("## lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
+    f_o.write("----------------------------------------------------------------------------------------------------   \n") 
+    f_o.write("* autoMCStats 0 1 1   \n")
+    f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation \n")
 
-f_o.close()
+    f_o.close()
 
 
 
 
 # compute EFTneg shapes
+
+tdhisto, onedhistos = Fill3DHisto(events, nbins_=bins, range_= mll_bins, scale=1)
 
 sm = onedhistos[0].copy()
 sm_l_q = onedhistos[1].copy()
@@ -346,10 +480,9 @@ f_o.write("process                                                              
 f_o.write("process                                                                         0                             -1                            -2    \n")                          
 f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}\n".format(sm_l_q.sum().value, q.sum().value, sm.sum().value))          
 f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-f_o.write("lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
+f_o.write("## lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
 f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-f_o.write("* autoMCStats 10 0 1   \n")
-f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation_$CHANNEL \n")
+f_o.write("* autoMCStats 0 1 1   \n")
+f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation \n")
 
 f_o.close()
-
