@@ -15,7 +15,7 @@
 #include "RooProduct.h"
 #include "vectorized.h"
 
-#define HFVERBOSE 0
+#define HFVERBOSE 2
 
 CMSHistErrorPropagator::CMSHistErrorPropagator() : initialized_(false) {}
 
@@ -232,9 +232,9 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       //  I guess we want to include other normalization scaling in the factor also when 
       //  computing the error...
 
-      //      std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
-      //      std::cout << vcoeffs_[i]->GetName() << std::endl;
-      //      std::cout << vcoeffs_[i]->getVal() << std::endl;
+      std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
+      std::cout << vcoeffs_[i]->GetName() << std::endl;
+      std::cout << vcoeffs_[i]->getVal() << std::endl;
       // valsum stores the sum of all the templates defined in this 
       // datacard bin (cycle over the pdfs, add coeff*value to valsum)
       vectorized::mul_add(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->cache()[0]), &valsum_[0]);
@@ -245,12 +245,12 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       auto samplename = vfuncs_[i]->getStringAttribute("combine.process");
       if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [samplename](const auto& mo) {return mo.second == samplename; }) != std::end(corrsamples_)){
 // #if HFVERBOSE > 0
-//         std::cout << " Skipping process " << vfuncs_[i]->getStringAttribute("combine.process") << " in err2sum" << std::endl;
-//         std::cout << "---- ERRORS ----" << std::endl;
-//         auto pp = &(vfuncs_[i]->errors()[0]);
-//         for (uint32_t i = 0; i < valsum_.size(); ++i) {
-//             std::cout << pp[i] << std::endl;
-//         } 
+         std::cout << " Skipping process " << vfuncs_[i]->getStringAttribute("combine.process") << " in err2sum" << std::endl;
+         std::cout << "---- ERRORS ----" << std::endl;
+         auto pp = &(vfuncs_[i]->errors()[0]);
+         for (uint32_t i = 0; i < valsum_.size(); ++i) {
+             std::cout << pp[i] << std::endl;
+         } 
 // #endif
         corrsamples_index_[samplename] = i;
         continue;
@@ -316,7 +316,7 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
     }
 #endif
 
-    // cache_ is a fast histo and store the overall template made from sig 
+    // cache_ is a fast histo and stores the overall template made from sig 
     // and bkg summed and multiplied by their scaling coefficients or multipliers
     cache_ = valsum_;
 
@@ -369,14 +369,20 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 
 
   if (!binsentry_.good() || eval != last_eval_) {
+    std::cout << "Run Barlow Beeston" << std::endl;
     runBarlowBeeston();
     // bintypes might have size == 0 if we never ran setupBinPars()
+    // cycle on each template bin
     for (unsigned j = 0; j < bintypes_.size(); ++j) {
       cache_[j] = valsum_[j];
       if (bintypes_[j][0] == 0) {
         continue;
       } else if (bintypes_[j][0] == 1) {
+        // this is the above pois th case, one gaus parameter for the bin
+        // take this parameter value
         double x = vbinpars_[j][0]->getVal();
+        // add to the overall sig + kg content (scaled) the value of 
+        // the total MC stat error multiplied by the parameter
         cache_[j] += toterr_[j] * x;
         // Only fill the scaledbinmods if we're in eval == 0 mode (i.e. need to
         // propagate to wrappers)
@@ -389,17 +395,29 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
         for (unsigned i = 0; i < bintypes_[j].size(); ++i) {
           if (bintypes_[j][i] == 2) {
             // Poisson: this is a multiplier on the process yield
+            // get poisson parameter and multiply for the process yield (not scaled)
+            // the Pois parameter x scales the yield of the process as n*x
+            // cache[j] contains the sum of all the processes in the bin 
+            // therefore we need to subtract the original n value and add back n*x
+            // therfore n*x -n = (x-1)*n or (vbinpars_[j][i]->getVal() - 1)*vfuncs_[i]->cache()[j]
             scaledbinmods_[i][j] = ((vbinpars_[j][i]->getVal() - 1.) *
                  vfuncs_[i]->cache()[j]);
+            // add to the overall cache, the varied process yield and multiply 
+            // for the additional normalization coefficients
             cache_[j] += (scaledbinmods_[i][j] * coeffvals_[i]);
           } else if (bintypes_[j][i] == 3) {
             // Gaussian This is the addition of the scaled error
+            // Take the gaus parameter and multiply it for the process error in this bin
             scaledbinmods_[i][j] = vbinpars_[j][i]->getVal() * vfuncs_[i]->errors()[j];
+            // add to the cache the scaled error multiplied for the additional 
+            // normalization coefficients
             cache_[j] += (scaledbinmods_[i][j] * coeffvals_[i]);
           }
         }
       }
     }
+    // Set to zero bins with total scaled bin yield below a 
+    // certain threshold (1e-9)
     cache_.CropUnderflows();
     binsentry_.reset();
   }
@@ -467,9 +485,9 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
         double gobs_val = 0.;
         for (RooAbsArg * arg : vbinpars_[j][0]->valueClients()) {
           if (arg == this || arg == &binsentry_) {
-            // std::cout << "Skipping " << this << " " << this->GetName() << "\n";
+            std::cout << "Skipping " << this << " " << this->GetName() << "\n";
           } else {
-            // std::cout << "Adding " << arg << " " << arg->GetName() << "\n";
+            std::cout << "Adding " << arg << " " << arg->GetName() << "\n";
             bb_.dirty_prop.insert(arg);
             auto as_gauss = dynamic_cast<RooGaussian*>(arg);
             if (as_gauss) {
@@ -548,12 +566,15 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
     // cycling on vfuncs meaning take the pdfs of the processes 
     // contributing in this analysis bin
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+      std::cout << vfuncs_[i]->getStringAttribute("combine.process") << std::endl;
       // if we skip the process e.g. if it is a signal process then continue
       if (skip_idx.count(i)) {
+        std::cout << "Skipping" << std::endl;
         continue;
       }
       // if not skipped compute the new corrected valsum for BB approach 
       // by summing the bin content at bin - j multiplied by scalers
+      std::cout << "Process " << vfuncs_[i]->getStringAttribute("combine.process") << " Sum " << vfuncs_[i]->cache()[j] << " Error " <<  vfuncs_[i]->errors()[j] << " Coeff " << coeffvals_[i] << std::endl;
       sub_sum += vfuncs_[i]->cache()[j] * coeffvals_[i];
       // add the error for this bin and this process in quadrature 
       // multiplied by the scaler
