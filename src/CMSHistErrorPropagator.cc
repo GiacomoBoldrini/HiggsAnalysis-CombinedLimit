@@ -138,13 +138,21 @@ void CMSHistErrorPropagator::initialize() const {
   //   //auto proc = vfuncs_[i]->getStringAttribute("combine.process");
   // }
 
-#if HFVERBOSE > 0
-  std::cout << " -- MC correlation --" << std::endl;
-  std::cout << "sample   binidx" << std::endl;
-  for (auto it = corrsamples_.begin(); it != corrsamples_.end(); it++){
-      std::cout << it->first  << "   " <<  it->second << std::endl;
+// #if HFVERBOSE > 0
+//   std::cout << " -- MC correlation --" << std::endl;
+//   std::cout << "sample   binidx" << std::endl;
+//   for (auto it = corrsamples_.begin(); it != corrsamples_.end(); it++){
+//       std::cout << it->first  << "   " <<  it->second << std::endl;
+//   }
+// #endif
+
+  // filling the corrsamples index map
+  for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+    auto samplename = vfuncs_[i]->getStringAttribute("combine.process");
+    if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [samplename](const auto& mo) {return mo.second == samplename; }) != std::end(corrsamples_)){
+      corrsamples_index_[samplename] = i;
+    }
   }
-#endif
   
   // the cache of the first vfunc is an instance of type
   // FastHisto defined in FastTemplate_Old
@@ -164,10 +172,19 @@ void CMSHistErrorPropagator::initialize() const {
   toterr_.resize(nb, 0.);
   // this is an std vector of std vector of double initialized empty
   // nb -> number of bins, nf -> number of pdfs 
+
+  // we can leave nf taking into account that we will
+  // skip the indices associated with correlated MC samples
+  // this will probably make the cod slower and memory consuming
+  // but we can easily modify the thing
   binmods_.resize(nf, std::vector<double>(nb, 0.));
   // this is an std vector of std vector of double initialized empty
   // nb -> number of bins, nf -> number of pdfs 
-  scaledbinmods_.resize(nf, std::vector<double>(nb, 0.));
+  // + 1 accounts for correlated MC stat sample 
+  // it is a fake sample  built from nf pdfs but we store it in the 
+  // last entry of the objects. We will skipp errror propagation
+  // for the pdfs building the overall thing
+  scaledbinmods_.resize(nf + 1, std::vector<double>(nb, 0.));
   // this is an std vector of double initialized empty
   // each pdf has one coefficient
   coeffvals_.resize(nf, 0.);
@@ -188,9 +205,9 @@ void CMSHistErrorPropagator::initialize() const {
 void CMSHistErrorPropagator::updateCache(int eval) const {
   initialize();
 
-  #if HFVERBOSE > 0
-    std::cout << "Update Cache of CMSHistErrorPropagator" << std::endl;
-  #endif
+// #if HFVERBOSE > 0
+//   std::cout << "Update Cache of CMSHistErrorPropagator" << std::endl;
+// #endif
 
 
 // #if HFVERBOSE > 0
@@ -213,7 +230,6 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 
     // store in a map the correlated sample name and its index in the 
     // vfuncs_ and coeffvals_ vectors 
-    std::map<std::string, unsigned int> corrsamples_index_;
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
 
       // // std::cout << vfuncs_[i]->getStringAttribute("combine.process") << std::endl;
@@ -231,10 +247,11 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       //  (1-k**2) for SM, 0.5*k*(k+1) for SM+Li+Qi and 0.5*k*(k-1) for SM-Li+Qi.
       //  I guess we want to include other normalization scaling in the factor also when 
       //  computing the error...
-
-      std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
-      std::cout << vcoeffs_[i]->GetName() << std::endl;
-      std::cout << vcoeffs_[i]->getVal() << std::endl;
+// #if HFVERBOSE > 0
+//       std::cout << "coeff for pdf " << vfuncs_[i]->GetName() << std::endl;
+//       std::cout << vcoeffs_[i]->GetName() << std::endl;
+//       std::cout << vcoeffs_[i]->getVal() << std::endl;
+// #endif
       // valsum stores the sum of all the templates defined in this 
       // datacard bin (cycle over the pdfs, add coeff*value to valsum)
       vectorized::mul_add(valsum_.size(), coeffvals_[i], &(vfuncs_[i]->cache()[0]), &valsum_[0]);
@@ -245,14 +262,14 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       auto samplename = vfuncs_[i]->getStringAttribute("combine.process");
       if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [samplename](const auto& mo) {return mo.second == samplename; }) != std::end(corrsamples_)){
 // #if HFVERBOSE > 0
-         std::cout << " Skipping process " << vfuncs_[i]->getStringAttribute("combine.process") << " in err2sum" << std::endl;
-         std::cout << "---- ERRORS ----" << std::endl;
-         auto pp = &(vfuncs_[i]->errors()[0]);
-         for (uint32_t i = 0; i < valsum_.size(); ++i) {
-             std::cout << pp[i] << std::endl;
-         } 
+//          std::cout << " Skipping process " << vfuncs_[i]->getStringAttribute("combine.process") << " in err2sum" << std::endl;
+//          std::cout << "---- ERRORS ----" << std::endl;
+//          auto pp = &(vfuncs_[i]->errors()[0]);
+//          for (uint32_t i = 0; i < valsum_.size(); ++i) {
+//              std::cout << pp[i] << std::endl;
+//          } 
 // #endif
-        corrsamples_index_[samplename] = i;
+        // corrsamples_index_[samplename] = i;
         continue;
       }
 
@@ -292,11 +309,11 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       
     }
     
-#if HFVERBOSE > 0
-    for (unsigned int i =0 ; i < valsum_.size(); ++i){
-        std::cout << "Correlated error at bin " << i << "   " << err2sumcorr_[i] <<std::endl;
-    }
-#endif
+// #if HFVERBOSE > 0
+//     for (unsigned int i =0 ; i < valsum_.size(); ++i){
+//         std::cout << "Correlated error at bin " << i << "   " << err2sumcorr_[i] <<std::endl;
+//     }
+// #endif
 
     // add correlated error squared to errors squared 
     vectorized::mul_add(valsum_.size(), 1, &(err2sumcorr_[0]), &err2sum_[0]);
@@ -310,11 +327,11 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
     for (unsigned int i = 0; i < valsum_.size(); ++i ){ toterr_[i] = toterr_[i]*1; }
     // 
 
-#if HFVERBOSE > 0
-    for (unsigned int i =0 ; i < valsum_.size(); ++i){
-        std::cout << "Overall error at bin " << i << "   " << toterr_[i] <<std::endl;
-    }
-#endif
+// #if HFVERBOSE > 0
+//     for (unsigned int i =0 ; i < valsum_.size(); ++i){
+//         std::cout << "Overall error at bin " << i << "   " << toterr_[i] <<std::endl;
+//     }
+// #endif
 
     // cache_ is a fast histo and stores the overall template made from sig 
     // and bkg summed and multiplied by their scaling coefficients or multipliers
@@ -328,15 +345,15 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
       for (unsigned j = 0; j < valsum_.size(); ++j) {
         // what is bintypes == 1?
         if (bintypes_[j][0] == 1) {
-#if HFVERBOSE > 1
-          std::cout<< "SONO QUI" << std::endl;
-          std::cout << "Bin " << j << "\n";
-          printf(" | %.6f/%.6f/%.6f\n", valsum_[j], err2sum_[j], toterr_[j]);
-#endif
+// #if HFVERBOSE > 1
+//           std::cout<< "SONO QUI" << std::endl;
+//           std::cout << "Bin " << j << "\n";
+//           printf(" | %.6f/%.6f/%.6f\n", valsum_[j], err2sum_[j], toterr_[j]);
+// #endif
           // cycle on the processes - i in this bin
           for (unsigned i = 0; i < vfuncs_.size(); ++i) {
             // if the overall err2 in this bin is > 0 and if this process is multplied
-            // by some factor
+            // by some factor > 0 
             if (err2sum_[j] > 0. && coeffvals_[i] > 0.) {
               // take error e as the error for this process in this bin 
               // and multiply it by the coefficient
@@ -369,7 +386,7 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 
 
   if (!binsentry_.good() || eval != last_eval_) {
-    std::cout << "Run Barlow Beeston" << std::endl;
+    // std::cout << "Run Barlow Beeston" << std::endl;
     runBarlowBeeston();
     // bintypes might have size == 0 if we never ran setupBinPars()
     // cycle on each template bin
@@ -392,26 +409,58 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
           }
         }
       } else {
+        // If we are below then bintypes_ at bin j will be a vector 
+        // with an entry for each process in the bin as defined in the datacard.
         for (unsigned i = 0; i < bintypes_[j].size(); ++i) {
-          if (bintypes_[j][i] == 2) {
-            // Poisson: this is a multiplier on the process yield
-            // get poisson parameter and multiply for the process yield (not scaled)
-            // the Pois parameter x scales the yield of the process as n*x
-            // cache[j] contains the sum of all the processes in the bin 
-            // therefore we need to subtract the original n value and add back n*x
-            // therfore n*x -n = (x-1)*n or (vbinpars_[j][i]->getVal() - 1)*vfuncs_[i]->cache()[j]
-            scaledbinmods_[i][j] = ((vbinpars_[j][i]->getVal() - 1.) *
-                 vfuncs_[i]->cache()[j]);
-            // add to the overall cache, the varied process yield and multiply 
-            // for the additional normalization coefficients
-            cache_[j] += (scaledbinmods_[i][j] * coeffvals_[i]);
-          } else if (bintypes_[j][i] == 3) {
-            // Gaussian This is the addition of the scaled error
-            // Take the gaus parameter and multiply it for the process error in this bin
-            scaledbinmods_[i][j] = vbinpars_[j][i]->getVal() * vfuncs_[i]->errors()[j];
-            // add to the cache the scaled error multiplied for the additional 
-            // normalization coefficients
-            cache_[j] += (scaledbinmods_[i][j] * coeffvals_[i]);
+          
+          // if the len of bin types is > funcs then it means that 
+          // we have an additional entry for the correlated sample
+
+          if ( i == vfuncs_.size() ){
+            // then this is the overall correlated MC 
+            // correlated samples will always have a gaussian parameter
+            // even under the poisson threshold because defining a poisson 
+            // is hard because we have W.C.
+
+            /*
+            std::cout << "SONO QUI" << std::endl;
+            std::cout << "i: " << i << " j: " << j << std::endl;
+            std::cout << " scaledbinmods_.size():" << scaledbinmods_.size() << " scaledbinmods_[i].size(): " << scaledbinmods_[i].size() << std::endl;
+            std::cout << " vbinpars_.size(): " << vbinpars_.size() << " vbinpars_[j].size(): " << vbinpars_[j].size() << std::endl; 
+            std::cout << " Eccolo " << vbinpars_[j][i]->getVal() << std::endl;
+            */
+            scaledbinmods_[i][j] = vbinpars_[j][i]->getVal() * std::sqrt(err2sumcorr_[j]);
+
+            cache_[j] += (scaledbinmods_[i][j] * 1.0);
+
+          } else {
+            // If this is not a correlated sample then we treat it as before
+            // We are only interested in bintypes_=2,3 for the process that means
+            // assigning a poisson or gaussian par to the process respectively
+            // otherwise we just skip this process
+            if (bintypes_[j][i] == 2) {
+              // Poisson: this is a multiplier on the process yield
+              // get poisson parameter and multiply for the process yield (not scaled)
+              // the Pois parameter x scales the yield of the process as n*x
+              // cache[j] contains the sum of all the processes in the bin 
+              // therefore we need to subtract the original n value and add back n*x
+              // therfore n*x -n = (x-1)*n or (vbinpars_[j][i]->getVal() - 1)*vfuncs_[i]->cache()[j]
+              scaledbinmods_[i][j] = ((vbinpars_[j][i]->getVal() - 1.) *
+                  vfuncs_[i]->cache()[j]);
+              // add to the overall cache, the varied process yield and multiply 
+              // for the additional normalization coefficients
+              cache_[j] += (scaledbinmods_[i][j] * coeffvals_[i]);
+            } else if (bintypes_[j][i] == 3) {
+              // Gaussian This is the addition of the scaled error
+              // Take the gaus parameter and multiply it for the process error in this bin
+              scaledbinmods_[i][j] = vbinpars_[j][i]->getVal() * vfuncs_[i]->errors()[j];
+              // add to the cache the scaled error multiplied for the additional 
+              // normalization coefficients
+              cache_[j] += (scaledbinmods_[i][j] * coeffvals_[i]);
+            } 
+            // else{
+            //   std::cout << "Bin: " << j << " Skipping process " << vfuncs_[i]->getStringAttribute("combine.process") << " for BB under poisson threshold becuase it has bin type " << bintypes_[j][i] << std::endl;
+            // }
           }
         }
       }
@@ -426,10 +475,16 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 }
 
 void CMSHistErrorPropagator::runBarlowBeeston() const {
-  if (!bb_.init) return;
+  if (!bb_.init) {
+// #if HFVERBOSE > 0
+//     std::cout << " Skipping runBarlow beeston, bb not initialize" << std::endl;
+// #endif
+    return;
+  }
   RooAbsArg::setDirtyInhibit(true);
 
   const unsigned n = bb_.use.size();
+  // std::cout << "n: " << n << std::endl;
   for (unsigned j = 0; j < n; ++j) {
     bb_.dat[j] = data_[bb_.use[j]];
     bb_.valsum[j] = valsum_[bb_.use[j]] * cache_.GetWidth(bb_.use[j]);
@@ -485,9 +540,9 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
         double gobs_val = 0.;
         for (RooAbsArg * arg : vbinpars_[j][0]->valueClients()) {
           if (arg == this || arg == &binsentry_) {
-            std::cout << "Skipping " << this << " " << this->GetName() << "\n";
+            //std::cout << "Skipping " << this << " " << this->GetName() << "\n";
           } else {
-            std::cout << "Adding " << arg << " " << arg->GetName() << "\n";
+            //std::cout << "Adding " << arg << " " << arg->GetName() << "\n";
             bb_.dirty_prop.insert(arg);
             auto as_gauss = dynamic_cast<RooGaussian*>(arg);
             if (as_gauss) {
@@ -515,6 +570,48 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
     bb_.init = true;
   }
 }
+
+// binidx is the bin number
+Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs) const{
+  double corr_bin_error = 0.;
+  std::vector<double> first_mult(mccorr_.binY(), 0);
+  // cycle on correlation matrix bins first in x and then in y
+  // make first multiplication
+  for (unsigned int i = 0; i < mccorr_.binY(); ++i){
+    for (unsigned int j = 0; j < mccorr_.binZ(); ++j){
+      // rwo times column product 
+      auto xsample = corrsamples_[i];
+      auto ysample = corrsamples_[j];
+
+      if (std::find_if(std::begin(skipped_procs), std::end(skipped_procs), [xsample](const auto& mo) {return mo == xsample; }) != std::end(skipped_procs)){
+        // std::cout << "Skipping correlated sample" << std::endl;
+        continue;
+      }
+      else if (std::find_if(std::begin(skipped_procs), std::end(skipped_procs), [ysample](const auto& mo) {return mo == ysample; }) != std::end(skipped_procs)){
+        // std::cout << "Skipping correlated sample" << std::endl;
+        continue;
+      }
+
+      auto xsidx = corrsamples_index_[xsample]; 
+      auto ysidx = corrsamples_index_[ysample]; 
+
+      // std::cout << xsample << " " << ysample << std::endl;
+      // std::cout << vfuncs_[xsidx]->errors()[bin_idx] << " " << " " <<  vfuncs_[ysidx]->errors()[bin_idx]<< " " << mccorr_.Get(bin_idx, i, j)<< " " << coeffvals_[ysidx] << std::endl;
+      // std::cout << "Factor " << mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx] << std::endl;
+      first_mult[i] +=  mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
+      // first_mult[i] +=  vfuncs_[xsidx]->errors()[bin_idx] *   vfuncs_[ysidx]->errors()[bin_idx] * mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
+    }
+  }
+
+  // now make second multiplication and store the result
+  for (unsigned int i = 0; i < mccorr_.binY(); ++i){
+      corr_bin_error += first_mult[i]*coeffvals_[corrsamples_index_[corrsamples_[i]]];
+  }
+
+  // variance -> error squared so we can sum in quadrature with non correlated errors
+  return corr_bin_error;
+}
+
 
 
 RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
@@ -562,26 +659,46 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
     std::cout << TString::Format("%-10i %-15f %-15f %-30s\n", j, valsum_[j], toterr_[j], "total sum");
     double sub_sum = 0.;
     double sub_err = 0.;
+    // also save the correlated one if there is 
+    double sub_sum_corr = 0.;
+    double sub_err_corr = 0.;
     // Check using a possible sub-set of processes
     // cycling on vfuncs meaning take the pdfs of the processes 
     // contributing in this analysis bin
     for (unsigned i = 0; i < vfuncs_.size(); ++i) {
       std::cout << vfuncs_[i]->getStringAttribute("combine.process") << std::endl;
+      auto samplename = vfuncs_[i]->getStringAttribute("combine.process");
       // if we skip the process e.g. if it is a signal process then continue
       if (skip_idx.count(i)) {
         std::cout << "Skipping" << std::endl;
         continue;
       }
+      // if this is a correlated process we skip 
+      if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [samplename](const auto& mo) {return mo.second == samplename; }) != std::end(corrsamples_)){        // error skipped but we still want to add the yields because it is not in skipped procs
+        sub_sum_corr += vfuncs_[i]->cache()[j] * coeffvals_[i];
+        sub_sum += vfuncs_[i]->cache()[j] * coeffvals_[i];
+        continue;
+      }
+
       // if not skipped compute the new corrected valsum for BB approach 
       // by summing the bin content at bin - j multiplied by scalers
-      std::cout << "Process " << vfuncs_[i]->getStringAttribute("combine.process") << " Sum " << vfuncs_[i]->cache()[j] << " Error " <<  vfuncs_[i]->errors()[j] << " Coeff " << coeffvals_[i] << std::endl;
       sub_sum += vfuncs_[i]->cache()[j] * coeffvals_[i];
       // add the error for this bin and this process in quadrature 
       // multiplied by the scaler
-      sub_err += std::pow(vfuncs_[i]->errors()[j] * coeffvals_[i], 2.);;
+      sub_err += std::pow(vfuncs_[i]->errors()[j] * coeffvals_[i], 2.);
     }
+
+    // compute the total correlated error squared
+    sub_err_corr = getBinCorrError(j, skipped_procs);
+    sub_err += sub_err_corr;
+
     // take the sqrt of the overall corrected error ignoring some processes
     sub_err = std::sqrt(sub_err);
+    sub_err_corr = std::sqrt(sub_err_corr);
+
+    std::cout << "Overall error " << sub_err << " Overall events " << sub_sum <<  " " << 0.5 + ((sub_sum * sub_sum) / (sub_err * sub_err)) << std::endl;
+    std::cout << "Overall correlated error " << sub_err_corr << " Overall correlated events " << sub_sum_corr << std::endl;
+
     if (skipped_procs.size()) {
       std::cout << TString::Format("%-10i %-15f %-15f %-30s\n", j, sub_sum, sub_err, "excluding marked processes");
     }
@@ -602,13 +719,26 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
     if (n <= poissonThreshold) {
       std::cout << TString::Format("  %-30s\n", "=> Number of weighted events is below Poisson threshold");
 
-      bintypes_[j].resize(vfuncs_.size(), 4);
+      // vfuncs_.size() accounts for both uncorrelated and correlated samples
+      // correlated ones will be skipped 
+      // we increase the size of bin types of one to store
+      // correlated MC sample. Last entry will be the correlated one
+      bintypes_[j].resize(vfuncs_.size() + 1, 4);
 
       for (unsigned i = 0; i < vfuncs_.size(); ++i) {
         std::string proc =
             vfuncs_[i]->stringAttributes().count("combine.process")
                 ? vfuncs_[i]->getStringAttribute("combine.process")
                 : vfuncs_[i]->GetName();
+
+        // skip this process if it is a correlated sample
+        if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [proc](const auto& mo) {return mo.second == proc; }) != std::end(corrsamples_)){
+          // std::cout << "Skipping computing error on correlated sample" << std::endl;
+          // assign bintypes = 4 to skip this process
+          std::cout << "Bintypes = 4 for process " << proc << std::endl;
+          bintypes_[j][i] = 4;
+          continue;
+        }
         double v_p = vfuncs_[i]->cache()[j];
         double e_p = vfuncs_[i]->errors()[j];
         std::cout << TString::Format("    %-20s %-15f %-15f %-30s\n", proc.c_str(), v_p, e_p, "");
@@ -637,9 +767,9 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
             RooRealVar *var = new RooRealVar(TString::Format("%s_bin%i_%s", this->GetName(), j, proc.c_str()), "", n_p_r, rmin, rmax);
             RooConstVar *cvar = new RooConstVar(TString::Format("%g", 1. / n_p_r), "", 1. / n_p_r);
             RooProduct *prod = new RooProduct(TString::Format("%s_prod", var->GetName()), "", RooArgList(*var, *cvar));
-	    RooArgSet ownedComps;
-	    ownedComps.add(*prod);
-	    ownedComps.add(*cvar);
+            RooArgSet ownedComps;
+            ownedComps.add(*prod);
+            ownedComps.add(*cvar);
             var->addOwnedComponents(ownedComps);
             var->setAttribute("createPoissonConstraint");
             res->addOwned(*var);
@@ -674,7 +804,58 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
         std::cout << "  " << std::string(58, '-') << "\n";
 
       }
+      // do the same for the overall correlated sample
+      double v_p = sub_sum_corr;
+      double e_p = sub_err_corr;
+      std::string proc = "OverallcorrelatedMCsample";
+      int i = bintypes_[j].size()-1;
+      if (e_p <= 0.) {
+        std::cout << TString::Format("      %-30s\n", "=> Correlated Error is zero, ignore");
+        bintypes_[j][i] = 4;
+      } else if (v_p < 0. && e_p > 0.) {
+        std::cout << TString::Format("      %-30s\n", "=> Cannot handle negative content for correlated sample, ignore");
+        bintypes_[j][i] = 4;
+      } else if ((v_p > 0. && e_p > 0. && v_p >= (e_p*0.999)) || (v_p >= 0 && e_p > v_p)) {
+        double n_p_r = int(0.5 + ((v_p * v_p) / (e_p * e_p)));
+        double alpha_p_r = v_p / n_p_r;
+        std::cout << TString::Format(
+            "    %-20s %-15f %-15f %-30s\n", "", n_p_r, std::sqrt(n_p_r),
+            TString::Format("Unweighted events, alpha=%f", alpha_p_r).Data());
+        
+        // always create a gaussian contraint also if we are below 
+        // poisson threshold for correlated MC 
+        RooRealVar *var = new RooRealVar(TString::Format("%s_bin%i_%s", this->GetName(), j, proc.c_str()), "", 0, -7, 7);
+        std::cout << TString::Format(
+            "      => Parameter %s[%.2f,%.2f,%.2f] to be Gaussian constrained\n",
+            var->GetName(), var->getVal(), var->getMin(), var->getMax());
+        var->setAttribute("createGaussianConstraint");
+        res->addOwned(*var);
+        binpars_.add(*var);
+        bintypes_[j][i] = 3;
+      } else{ 
+        std::cout << "      => ERROR: shouldn't be here\n";
+      }
+      std::cout << "  " << std::string(58, '-') << "\n";
+
+#if HFVERBOSE > 4
+      std:: cout << " -- CORRELATED OVERALL PARAMETER --" << std::endl;
+      std::cout << "Index: " << i << " bintypes_[j].size() " << bintypes_[j].size() << std::endl; 
+
+      // printout bintypes before fillin vbinpars
+      for (unsigned i = 0; i < vfuncs_.size() + 1; ++i) {
+        if (i != vfuncs_.size()){
+          std::cout << "i: " << i << " Bin: " << j << " pdf: " << vfuncs_[i]->getStringAttribute("combine.process") << " bintype: " << bintypes_[j][i] << std::endl;
+        } else{
+          std::cout << "i: " << i << " Bin: " << j << " pdf: overallCorrelatedMC" << " bintype: " << bintypes_[j][i] << std::endl;
+        }
+      }
+#endif
+
+    // If above poisson threshold then everything is ok because 
+    // the single gaussian parameter will scale the total error
+    // and the error in updateCache already handles correlations
     } else if (toterr_[j] > 0.) {
+      std::cout << TString::Format("  %-30s\n", "=> Number of weighted events is above Poisson threshold");
       bintypes_[j][0] = 1;
       RooRealVar *var = new RooRealVar(TString::Format("%s_bin%i", this->GetName(), j), "", 0, -7, 7);
       std::cout << TString::Format(
@@ -688,16 +869,33 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
     std::cout << std::string(60, '-') << "\n";
   }
 
+#if HFVERBOSE > 4
+  // printout bintypes before fillin vbinpars
+  for (unsigned j = 0; j < valsum_.size(); ++j) {
+    for (unsigned i = 0; i < vfuncs_.size() + 1; ++i) {
+      if (i != vfuncs_.size()){
+        std::cout << "Bin: " << j << " pdf: " << vfuncs_[i]->getStringAttribute("combine.process") << " bintype: " << bintypes_[j][i] << std::endl;
+      } else{
+        std::cout << "Bin: " << j << " pdf: overallCorrelatedMC" << " bintype: " << bintypes_[j][i] << std::endl;
+      }
+    }
+  }
+#endif 
+
   // binpars_.add(*res);
   // std::cout << "Adding binpars_ " << std::endl;
   // binpars_.print(true);
   binsentry_.addVars(binpars_);
   binsentry_.setValueDirty();
 
+  // std::cout << " --- Filling vbinpars --- " << std::endl;
   for (unsigned j = 0, r = 0; j < valsum_.size(); ++j) {
+    // std::cout << j << "/" << valsum_.size() << " bintypes size " << bintypes_[j].size() << std::endl;
     vbinpars_[j].resize(bintypes_[j].size());
     for (unsigned i = 0; i < bintypes_[j].size(); ++i) {
+      // std::cout << " i: " <<  i << " bintypes_[j][i]: " << bintypes_[j][i] << std::endl;
       if (bintypes_[j][i] >= 1 && bintypes_[j][i] < 4) {
+        // std::cout << " Sono nell'if " << bintypes_[j][i] << " binpars_.size(): " << binpars_.size() << " r:  " << r << " binpars_.at(r): " << binpars_.at(r) <<  std::endl;
         vbinpars_[j][i] = dynamic_cast<RooAbsReal *>(binpars_.at(r));
         ++r;
       }

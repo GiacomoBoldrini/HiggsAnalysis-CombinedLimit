@@ -44,32 +44,32 @@ def plot(events, scale=1):
 
     ##########
 
-    h_mll_cQl1 = Hist(
+    h_mll_cje = Hist(
         hist.axis.Regular(
-            bins, *mll_bins, name="mll_cQl1", label="mll [GeV]", underflow=False, overflow=False
+            bins, *mll_bins, name="mll_cje", label="mll [GeV]", underflow=False, overflow=False
         ),
         hist.storage.Weight()
     )
 
-    h_ptl_cQl1 = Hist(
+    h_ptl_cje = Hist(
         hist.axis.Regular(
-            bins, *ptl_bins,  name="ptl1_cQl1", label="ptl1 [GeV]", underflow=False, overflow=False
+            bins, *ptl_bins,  name="ptl1_cje", label="ptl1 [GeV]", underflow=False, overflow=False
         ),
         hist.storage.Weight()
     )
 
     ##########
 
-    h_mll_mcQl1 = Hist(
+    h_mll_mcje = Hist(
         hist.axis.Regular(
-            bins, *mll_bins, name="mll_mcQl1", label="mll [GeV]", underflow=False, overflow=False
+            bins, *mll_bins, name="mll_mcje", label="mll [GeV]", underflow=False, overflow=False
         ),
         hist.storage.Weight()
     )
 
-    h_ptl_mcQl1 = Hist(
+    h_ptl_mcje = Hist(
         hist.axis.Regular(
-            bins, *ptl_bins,  name="ptl1_mcQl1", label="ptl1 [GeV]", underflow=False, overflow=False
+            bins, *ptl_bins,  name="ptl1_mcje", label="ptl1 [GeV]", underflow=False, overflow=False
         ),
         hist.storage.Weight()
     )
@@ -79,34 +79,34 @@ def plot(events, scale=1):
     h_mll.fill(events.mll, weight=events.LHEReweightingWeight[:,0]*scale)
     h_ptl.fill(events.ptl1, weight=events.LHEReweightingWeight[:,0]*scale)
 
-    h_mll_cQl1.fill(events.mll, weight=events.LHEReweightingWeight[:,40]*scale)
-    h_ptl_cQl1.fill(events.ptl1, weight=events.LHEReweightingWeight[:,40]*scale)
+    h_mll_cje.fill(events.mll, weight=events.LHEReweightingWeight[:,40]*scale)
+    h_ptl_cje.fill(events.ptl1, weight=events.LHEReweightingWeight[:,40]*scale)
 
-    h_mll_mcQl1.fill(events.mll, weight=events.LHEReweightingWeight[:,39]*scale)
-    h_ptl_mcQl1.fill(events.ptl1, weight=events.LHEReweightingWeight[:,39]*scale)
+    h_mll_mcje.fill(events.mll, weight=events.LHEReweightingWeight[:,39]*scale)
+    h_ptl_mcje.fill(events.ptl1, weight=events.LHEReweightingWeight[:,39]*scale)
 
     h_mll.view().value = h_mll.view().value/scale
     h_ptl.view().value = h_ptl.view().value/scale
-    h_mll_cQl1.view().value = h_mll_cQl1.view().value/scale
-    h_ptl_cQl1.view().value = h_ptl_cQl1.view().value/scale
-    h_mll_mcQl1.view().value = h_mll_mcQl1.view().value/scale
-    h_ptl_mcQl1.view().value = h_ptl_mcQl1.view().value/scale
+    h_mll_cje.view().value = h_mll_cje.view().value/scale
+    h_ptl_cje.view().value = h_ptl_cje.view().value/scale
+    h_mll_mcje.view().value = h_mll_mcje.view().value/scale
+    h_ptl_mcje.view().value = h_ptl_mcje.view().value/scale
 
 
     fig, ax = plt.subplots(1,2, figsize=(20,10), dpi=160)
-    # h_mll.plot(ax=ax[0], w2method="sqrt", label="cQl1=0 (SM)")
+    # h_mll.plot(ax=ax[0], w2method="sqrt", label="cje=0 (SM)")
 
-    h_mll_cQl1.plot(ax=ax[0], w2method="sqrt", color='green', label="cQl1=1")
-    #h_mll_mcQl1.plot(ax=ax[0], w2method="sqrt", color='black', label="cQl1=-1")
+    h_mll_cje.plot(ax=ax[0], w2method="sqrt", color='green', label="cje=1")
+    #h_mll_mcje.plot(ax=ax[0], w2method="sqrt", color='black', label="cje=-1")
 
     ax[0].legend()
     hep.cms.label(
             "Preliminary", data=True, ax=ax[0]
         )  # ,fontsize=16)
 
-    # h_ptl.plot(ax=ax[1], w2method="sqrt", label="cQl1=0 (SM)")
-    h_ptl_cQl1.plot(ax=ax[1], w2method="sqrt", color='green', label="cQl1=1")
-    #h_ptl_mcQl1.plot(ax=ax[1], w2method="sqrt", color='black', label="cQl1=-1")
+    # h_ptl.plot(ax=ax[1], w2method="sqrt", label="cje=0 (SM)")
+    h_ptl_cje.plot(ax=ax[1], w2method="sqrt", color='green', label="cje=1")
+    #h_ptl_mcje.plot(ax=ax[1], w2method="sqrt", color='black', label="cje=-1")
 
     ax[1].legend()
 
@@ -141,7 +141,7 @@ def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000], scale=1):
              np.linspace(0, 3, 3+1),
             ]
     
-    samples = ["sm", "w1_cQl1", "wm1_cQl1"]
+    samples = ["sm", "w1_cje", "wm1_cje", "w1_cHj1", "wm1_cHj1", "w11_cje_cHj1"]
 
     h = Hist(
         hist.axis.Regular(nbins_, 0, 2000),
@@ -166,14 +166,42 @@ def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000], scale=1):
         storage=hist.storage.Weight()
     )
 
+    
+    h_w1_cHj1 = Hist(
+        hist.axis.Regular(nbins_,*range_, name=var_, label=var_, underflow=False, overflow=False), 
+        storage=hist.storage.Weight()
+    )
+    
+    h_wm1_cHj1 = Hist(
+        hist.axis.Regular(nbins_,*range_, name=var_, label=var_, underflow=False, overflow=False), 
+        storage=hist.storage.Weight()
+    )
+
+    h_w11_cje_cHj1 = Hist(
+        hist.axis.Regular(nbins_,*range_, name=var_, label=var_, underflow=False, overflow=False), 
+        storage=hist.storage.Weight()
+    )
+
     h_w0.fill(events[var_], weight=events.LHEReweightingWeight[:,0]*scale)
+
     h_w1.fill(events[var_], weight=events.LHEReweightingWeight[:,40]*scale)
     h_wm1.fill(events[var_], weight=events.LHEReweightingWeight[:,39]*scale)
+
+    h_w1_cHj1.fill(events[var_], weight=events.LHEReweightingWeight[:,6]*scale)
+    h_wm1_cHj1.fill(events[var_], weight=events.LHEReweightingWeight[:,5]*scale)
+
+    h_w11_cje_cHj1.fill(events[var_], weight=events.LHEReweightingWeight[:,118]*scale)
 
     # normalize back the histos
     h_w0.view().value = h_w0.view().value / scale
     h_w1.view().value = h_w1.view().value / scale
     h_wm1.view().value = h_wm1.view().value / scale
+
+    h_w1_cHj1.view().value = h_w1_cHj1.view().value / scale
+    h_wm1_cHj1.view().value = h_wm1_cHj1.view().value / scale
+
+    h_w11_cje_cHj1.view().value = h_w11_cje_cHj1.view().value / scale
+
     
     
     
@@ -205,31 +233,102 @@ def Fill3DHisto(events, var_='mll', nbins_=10, range_=[800,1000], scale=1):
         # for events falling in this bin
         
         w0 = ev__.LHEReweightingWeight[:,0] * scale
+
+        # this is cje
         w1 = ev__.LHEReweightingWeight[:,40] * scale
         wm1 = ev__.LHEReweightingWeight[:,39] * scale
+
+        # this is cHj1
+        w1_cHj1 = ev__.LHEReweightingWeight[:,6] * scale
+        wm1_cHj1 = ev__.LHEReweightingWeight[:,5] * scale
+
+        w11_cje_cHj1 = ev__.LHEReweightingWeight[:,118] * scale
+
+
         
         s_AA = ak.sum(w0**2)
         s_BB = ak.sum(w1**2)
         s_CC = ak.sum(wm1**2)
+
+        s_DD = ak.sum(w1_cHj1**2)
+        s_EE = ak.sum(wm1_cHj1**2)
+
+        s_FF = ak.sum(w11_cje_cHj1**2)
         
+
+        # This is the old correlation with np.corr 
+        # Which is wrong because we cannot define a correlation 
+        # on the bin yield from the event weights
         
-        s_AB = 2*ak.corr(w0, w1)*np.sqrt(s_AA)*np.sqrt(s_BB)
-        s_AC = 2*ak.corr(w0, wm1)*np.sqrt(s_AA)*np.sqrt(s_CC)
-        s_BC = 2*ak.corr(w1, wm1)*np.sqrt(s_BB)*np.sqrt(s_CC)
+        # s_AB = 2*ak.corr(w0, w1)*np.sqrt(s_AA)*np.sqrt(s_BB)
+        # s_AC = 2*ak.corr(w0, wm1)*np.sqrt(s_AA)*np.sqrt(s_CC)
+        # s_AD = 2*ak.corr(w0, w1_cHj1)*np.sqrt(s_AA)*np.sqrt(s_DD)
+        # s_AE = 2*ak.corr(w0, wm1_cHj1)*np.sqrt(s_AA)*np.sqrt(s_EE)
+        # s_AF = 2*ak.corr(w0, w11_cje_cHj1)*np.sqrt(s_AA)*np.sqrt(s_FF)
+ 
+        # s_BC = 2*ak.corr(w1, wm1)*np.sqrt(s_BB)*np.sqrt(s_CC)
+        # s_BD = 2*ak.corr(w1, w1_cHj1)*np.sqrt(s_BB)*np.sqrt(s_DD)
+        # s_BE = 2*ak.corr(w1, wm1_cHj1)*np.sqrt(s_BB)*np.sqrt(s_EE)
+        # s_BF = 2*ak.corr(w1, w11_cje_cHj1)*np.sqrt(s_BB)*np.sqrt(s_FF)
+ 
+        # s_CD = 2*ak.corr(wm1, w1_cHj1)*np.sqrt(s_CC)*np.sqrt(s_DD)
+        # s_CE = 2*ak.corr(wm1, wm1_cHj1)*np.sqrt(s_CC)*np.sqrt(s_EE)
+        # s_CF = 2*ak.corr(wm1, w11_cje_cHj1)*np.sqrt(s_CC)*np.sqrt(s_FF)
+ 
+        # s_DE = 2*ak.corr(w1_cHj1, wm1_cHj1)*np.sqrt(s_DD)*np.sqrt(s_EE)
+        # s_DF = 2*ak.corr(w1_cHj1, w11_cje_cHj1)*np.sqrt(s_DD)*np.sqrt(s_FF)
+ 
+        # s_EF = 2*ak.corr(wm1_cHj1, w11_cje_cHj1)*np.sqrt(s_EE)*np.sqrt(s_FF)
+
+        s_AB = 2*ak.sum(w0*w1)
+        s_AC = 2*ak.sum(w0*wm1)
+        s_AD = 2*ak.sum(w0*w1_cHj1)
+        s_AE = 2*ak.sum(w0*wm1_cHj1)
+        s_AF = 2*ak.sum(w0*w11_cje_cHj1)
+        s_BC = 2*ak.sum(w1*wm1)
+        s_BD = 2*ak.sum(w1*w1_cHj1)
+        s_BE = 2*ak.sum(w1*wm1_cHj1)
+        s_BF = 2*ak.sum(w1*w11_cje_cHj1)
+        s_CD = 2*ak.sum(wm1*w1_cHj1)
+        s_CE = 2*ak.sum(wm1*wm1_cHj1)
+        s_CF = 2*ak.sum(wm1*w11_cje_cHj1)
+        s_DE = 2*ak.sum(w1_cHj1*wm1_cHj1)
+        s_DF = 2*ak.sum(w1_cHj1*w11_cje_cHj1)
+        s_EF = 2*ak.sum(wm1_cHj1*w11_cje_cHj1)
+
+
         
         # this should appear in top left
         h[b_,0,0] = s_AA
         h[b_,0,1] = s_AB
         h[b_,0,2] = s_AC
+        h[b_,0,3] = s_AD
+        h[b_,0,4] = s_AE
+        h[b_,0,5] = s_AF
+
         h[b_,1,1] = s_BB
         h[b_,1,2] = s_BC
-        h[b_,2,2] = s_CC
+        h[b_,1,3] = s_BD
+        h[b_,1,4] = s_BE
+        h[b_,1,5] = s_BF
 
-        print(s_AA, s_AB, s_AC, s_BB, s_BC, s_CC)
+        h[b_,2,2] = s_CC
+        h[b_,2,3] = s_CD
+        h[b_,2,4] = s_CE
+        h[b_,2,5] = s_CF
+
+        h[b_,3,3] = s_DD
+        h[b_,3,4] = s_DE
+        h[b_,3,5] = s_DF
+
+        h[b_,4,4] = s_EE
+        h[b_,4,5] = s_EF
+
+        h[b_,5,5] = s_FF
         
     
         
-    return h, (h_w0, h_w1, h_wm1)
+    return h, (h_w0, h_w1, h_wm1, h_w1_cHj1, h_wm1_cHj1, h_w11_cje_cHj1)
         
         
 
@@ -394,19 +493,22 @@ print("Number of events {}".format(len(events)))
 
 for scale in [1, 2, 5, 10]:
     plot(events, scale=scale)
-    # make datacards and shapes for the cQl1 operator
+    # make datacards and shapes for the cje operator
 
     mll_bins = (0, 2000)
-    bins = 1
+    bins = 10
 
     tdhisto, onedhistos = Fill3DHisto(events, nbins_=bins, range_= mll_bins, scale=scale)
 
-    fname = f"shapes_{scale}.root"
+    fname = f"shapes/shapes_{scale}.root"
     f = uproot.recreate(f"{fname}")
     f["histo_correlation"] = tdhisto
     f["histo_sm"] = onedhistos[0]
-    f["histo_w1_cQl1"] = onedhistos[1]
-    f["histo_wm1_cQl1"] = onedhistos[2]
+    f["histo_w1_cje"] = onedhistos[1]
+    f["histo_wm1_cje"] = onedhistos[2]
+    f["histo_w1_cHj1"] = onedhistos[3]
+    f["histo_wm1_cHj1"] = onedhistos[4]
+    f["histo_w11_cje_cHj1"] = onedhistos[5]
     f.close()
 
 
@@ -421,16 +523,16 @@ for scale in [1, 2, 5, 10]:
     f_o.write("kmax * number of nuisance parameters\n")
     f_o.write("----------------------------------------------------------------------------------------------------\n")
     f_o.write("bin         inclusive_all\n")
-    f_o.write(f"shapes  *           * shapes/{fname}     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC\n")
-    f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all \n")                
-    f_o.write("process                                                                         w1_cQl1                            wm1_cQl1              sm   \n")                          
-    f_o.write("process                                                                         0                             -1                            -2    \n")                          
-    f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}\n".format(onedhistos[1].sum().value, onedhistos[2].sum().value, onedhistos[0].sum().value))          
+    f_o.write(f"shapes  *           * {fname}     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC\n")
+    f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all                 inclusive_all                 inclusive_all                 inclusive_all \n")                
+    f_o.write("process                                                                         w1_cje                       wm1_cje                      sm                            w1_cHj1                       wm1_cHj1                      w11_cje_cHj1\n")                          
+    f_o.write("process                                                                         0                             -1                            -2                            -3                            -4                            -5\n")                          
+    f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}                        {:.4f}                        {:.4f}                        {:.4f}\n".format(onedhistos[1].sum().value, onedhistos[2].sum().value, onedhistos[0].sum().value, onedhistos[3].sum().value, onedhistos[4].sum().value, onedhistos[5].sum().value))          
     f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-    f_o.write("## lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
+    f_o.write("lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01                          1.01                          1.01                          1.01\n")                         
     f_o.write("----------------------------------------------------------------------------------------------------   \n") 
     f_o.write("* autoMCStats 0 1 1   \n")
-    f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation \n")
+    f_o.write(f"* autoMCCorr {fname}   histo_correlation \n")
 
     f_o.close()
 
@@ -442,25 +544,41 @@ for scale in [1, 2, 5, 10]:
 tdhisto, onedhistos = Fill3DHisto(events, nbins_=bins, range_= mll_bins, scale=1)
 
 sm = onedhistos[0].copy()
-sm_l_q = onedhistos[1].copy()
+sm_l_q_cje = onedhistos[1].copy()
 
-q = onedhistos[1].copy()
+q_cje = onedhistos[1].copy()
 
-values = (onedhistos[1].view().value + onedhistos[2].view().value - 2*onedhistos[0].view().value)*0.5
-q.view().value = values
+values_cje = (onedhistos[1].view().value + onedhistos[2].view().value - 2*onedhistos[0].view().value)*0.5
+q_cje.view().value = values_cje
+
+
+sm_l_q_cHj1 = onedhistos[3].copy()
+
+q_cHj1 = onedhistos[3].copy()
+
+values_cHj1 = (onedhistos[3].view().value + onedhistos[4].view().value - 2*onedhistos[0].view().value)*0.5
+q_cHj1.view().value = values_cHj1
+
+sm_l_q_mixed = onedhistos[5].copy()
 
 # set tp zero variances
-q.view().variance = np.zeros(len(q.view().variance))
-sm.view().variance = np.zeros(len(q.view().variance))
-sm_l_q.view().variance = np.zeros(len(q.view().variance))
+q_cje.view().variance = np.zeros(len(q_cje.view().variance))
+q_cHj1.view().variance = np.zeros(len(q_cHj1.view().variance))
+sm.view().variance = np.zeros(len(sm.view().variance))
+sm_l_q_cje.view().variance = np.zeros(len(sm_l_q_cje.view().variance))
+sm_l_q_cHj1.view().variance = np.zeros(len(sm_l_q_cHj1.view().variance))
+sm_l_q_mixed.view().variance = np.zeros(len(sm_l_q_mixed.view().variance))
 
 
 
-fname = "shapes_EFTNeg.root"
+fname = "shapes/shapes_EFTNeg.root"
 f = uproot.recreate(f"{fname}")
 f["histo_sm"] = sm
-f["histo_sm_lin_quad_cQl1"] = sm_l_q
-f["histo_quad_cQl1"] = q
+f["histo_sm_lin_quad_cje"] = sm_l_q_cje
+f["histo_quad_cje"] = q_cje
+f["histo_quad_cHj1"] = q_cHj1
+f["histo_sm_lin_quad_cHj1"] = sm_l_q_cHj1
+f["histo_sm_lin_quad_mixed_cje_cHj1"] = sm_l_q_mixed
 f.close()
 
 
@@ -475,14 +593,14 @@ f_o.write("kmax * number of nuisance parameters\n")
 f_o.write("----------------------------------------------------------------------------------------------------\n")
 f_o.write("bin         inclusive_all\n")
 f_o.write(f"shapes  *           * shapes/{fname}     histo_$PROCESS histo_$PROCESS_$SYSTEMATIC\n")
-f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all \n")                
-f_o.write("process                                                                         sm_lin_quad_cQl1                            quad_cQl1              sm   \n")                          
-f_o.write("process                                                                         0                             -1                            -2    \n")                          
-f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}\n".format(sm_l_q.sum().value, q.sum().value, sm.sum().value))          
+f_o.write("bin                                                                             inclusive_all                 inclusive_all                 inclusive_all                 inclusive_all                 inclusive_all                 inclusive_all \n")                
+f_o.write("process                                                                         sm_lin_quad_cje              quad_cje                     sm                            sm_lin_quad_cHj1              quad_cHj1                     sm_lin_quad_mixed_cje_cHj1\n")                          
+f_o.write("process                                                                         0                             -1                            -2                            -3                            -4                            -5 \n")                          
+f_o.write("rate                                                                            {:.4f}                        {:.4f}                        {:.4f}                        {:.4f}                        {:.4f}                        {:.4f}\n".format(sm_l_q_cje.sum().value, q_cje.sum().value, sm.sum().value, sm_l_q_cHj1.sum().value, q_cHj1.sum().value, sm_l_q_mixed.sum().value))          
 f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-f_o.write("## lumi_13TeV_2016                                             lnN                 1.01                          1.01                          1.01     \n")                         
+f_o.write("lumi_13TeV_2016                lnN                                           1.01                          1.01                          1.01                          1.01                          1.01                          1.01     \n")                         
 f_o.write("----------------------------------------------------------------------------------------------------   \n") 
-f_o.write("* autoMCStats 0 1 1   \n")
-f_o.write(f"* autoMCCorr shapes/{fname}   histo_correlation \n")
+f_o.write("## * autoMCStats 0 1 1   \n")
+f_o.write(f"## * autoMCCorr shapes/{fname}   histo_correlation \n")
 
 f_o.close()

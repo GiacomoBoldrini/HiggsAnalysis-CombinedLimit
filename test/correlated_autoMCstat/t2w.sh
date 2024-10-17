@@ -14,6 +14,4 @@ text2workspace.py datacard_5.txt \
 # -P HiggsAnalysis.AnalyticAnomalousCoupling.AnomalousCouplingMorphing:analiticAnomalousCouplingMorphing \
 # -o   model_10.root    --X-allow-no-signal  --PO eftOperators=cQl1 --X-allow-no-background --verbose -1
 # 
-# text2workspace.py datacard_EFTNeg.txt \
-# -P HiggsAnalysis.AnalyticAnomalousCoupling.AnomalousCouplingEFTNegative:analiticAnomalousCouplingEFTNegative \
-# -o   model_EFTNeg.root    --X-allow-no-signal  --PO eftOperators=cQl1 --X-allow-no-background --verbose -1
+# text2workspace.py datacard_EFTNeg.txt  -P HiggsAnalysis.AnalyticAnomalousCoupling.AnomalousCouplingEFTNegative:analiticAnomalousCouplingEFTNegative -o   model_EFTNeg.root    --X-allow-no-signal  --PO eftOperators=cQl1 --X-allow-no-background --verbose -1

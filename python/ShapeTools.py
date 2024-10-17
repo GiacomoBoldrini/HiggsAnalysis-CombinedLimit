@@ -884,13 +884,13 @@ class ShapeBuilder(ModelBuilder):
         return self.shape2Data(self.getShape(channel, process, syst), channel, process)
 
     def getPdf(self, channel, process, _cache={}):
-        print("---> Sono in getPdf")
+        # print("---> Sono in getPdf")
         postFix = "Sig" if (process in self.DC.isSignal and self.DC.isSignal[process]) else "Bkg"
         if (channel, process) in _cache:
             return _cache[(channel, process)]
-        print(f"--> Retrieve nominal shape for {channel}, {process}")
+        # print(f"--> Retrieve nominal shape for {channel}, {process}")
         shapeNominal = self.getShape(channel, process)
-        print(f"--> Convert nominal shape {shapeNominal} in pdf for {channel}, {process}")
+        # print(f"--> Convert nominal shape {shapeNominal} in pdf for {channel}, {process}")
         nominalPdf = self.shape2Pdf(shapeNominal, channel, process) if (self.options.useHistPdf == "always" or shapeNominal == None) else shapeNominal
         if shapeNominal == None:
             return nominalPdf  # no point morphing a fake shape
@@ -1281,7 +1281,7 @@ class ShapeBuilder(ModelBuilder):
         return _cache[shape.GetName()]
 
     def shape2Pdf(self, shape, channel, process, _cache={}):
-        print(f"---> Sono in shape2Pdf channel: {channel} process: {process} shape: {shape}")
+        # print(f"---> Sono in shape2Pdf channel: {channel} process: {process} shape: {shape}")
         postFix = "Sig" if (process in self.DC.isSignal and self.DC.isSignal[process]) else "Bkg"
         channelBinParFlag = channel in list(self.DC.binParFlags.keys())
         if shape == None:

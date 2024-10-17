@@ -882,7 +882,7 @@ class ModelBuilder(ModelBuilderBase):
 
     def doExpectedEvents(self):
         self.doComment(" --- Expected events in each bin, for each process ----")
-        print("--- Expected events in each bin, for each process ----")
+        # print("--- Expected events in each bin, for each process ----")
         for b in self.DC.bins:
             for p in self.DC.exp[b].keys():  # so that we get only self.DC.processes contributing to this bin
                 # if it's a zero background, write a zero and move on
@@ -970,15 +970,15 @@ class ModelBuilder(ModelBuilderBase):
                     else:
                         raise RuntimeError("Unsupported pdf %s" % pdf)
 
-                print(f"factors list for {p} in bin {b} is {factors}")
+                # print(f"factors list for {p} in bin {b} is {factors}")
                 # optimize constants
                 if len(factors) + len(logNorms) + len(alogNorms) == 0:
-                    print("factors + logNorms + algo == 0")
+                    # print("factors + logNorms + algo == 0")
                     norm = selfNormRate if b in self.selfNormBins else self.DC.exp[b][p]
                     self.doVar("n_exp_bin%s_proc_%s[%g]" % (b, p, norm))
                 else:
                     norm = selfNormRate if b in self.selfNormBins else nominal
-                    print("Process %s of bin %s depends on:\n\tlog-normals: %s\n\tasymm log-normals: %s\n\tother factors: %s\n" % (p,b,logNorms, alogNorms, factors))
+                    # print("Process %s of bin %s depends on:\n\tlog-normals: %s\n\tasymm log-normals: %s\n\tother factors: %s\n" % (p,b,logNorms, alogNorms, factors))
                     procNorm = ROOT.ProcessNormalization("n_exp_bin%s_proc_%s" % (b, p), "", norm)
                     for kappa, thetaName in logNorms:
                         procNorm.addLogNormal(kappa, self.out.function(thetaName))
@@ -1002,7 +1002,7 @@ class ModelBuilder(ModelBuilderBase):
                         else:
                             raise RuntimeError("Cannot add nonexistent factor %s for process %s, bin %s" % (factorName, p, b))
 
-                    print(procNorm)
+                    # print(procNorm)
 
                     # take care of any variables which were renamed (eg for "param")
                     (

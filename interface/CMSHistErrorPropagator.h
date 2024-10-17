@@ -95,6 +95,7 @@ public:
   mutable FastHisto3D mccorr_; // Need to make this better... why with TH3 it does not work?
   // save the mapping of bin labels to bin number.
   mutable std::map<unsigned int, std::string> corrsamples_;
+  mutable std::map<std::string, unsigned int> corrsamples_index_;
   //
   mutable std::vector<CMSHistFunc const*> vfuncs_; //!
   mutable std::vector<RooAbsReal const*> vcoeffs_; //!
@@ -173,6 +174,8 @@ public:
 
   void initialize() const;
   void updateCache(int eval = 1) const;
+
+  Double_t getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs) const;
 
   void runBarlowBeeston() const;
 
