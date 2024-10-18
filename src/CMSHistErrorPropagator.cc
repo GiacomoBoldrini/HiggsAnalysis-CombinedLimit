@@ -572,7 +572,7 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
 }
 
 // binidx is the bin number
-Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs) const{
+Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs, std::vector<std::string> keep_procs) const{
   double corr_bin_error = 0.;
   std::vector<double> first_mult(mccorr_.binY(), 0);
   // cycle on correlation matrix bins first in x and then in y
@@ -584,11 +584,16 @@ Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<s
       auto ysample = corrsamples_[j];
 
       if (std::find_if(std::begin(skipped_procs), std::end(skipped_procs), [xsample](const auto& mo) {return mo == xsample; }) != std::end(skipped_procs)){
-        // std::cout << "Skipping correlated sample" << std::endl;
         continue;
       }
       else if (std::find_if(std::begin(skipped_procs), std::end(skipped_procs), [ysample](const auto& mo) {return mo == ysample; }) != std::end(skipped_procs)){
-        // std::cout << "Skipping correlated sample" << std::endl;
+        continue;
+      }
+      // case where we need to compute the sum on a sub-matrix of the correlation matrix (e.g. a datacard bin where not all operators are included)
+      else if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
+        continue;
+      }
+      else if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
         continue;
       }
 
@@ -635,6 +640,7 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
   std::cout << "Poisson cut-off: " << poissonThreshold << "\n";
   std::set<unsigned> skip_idx;
   std::vector<std::string> skipped_procs;
+  std::vector<std::string> correlated_procs;
   for (unsigned i = 0; i < vfuncs_.size(); ++i) {
     if (vfuncs_[i]->attributes().count("skipForErrorSum")) {
       skipped_procs.push_back(vfuncs_[i]->getStringAttribute("combine.process"));
@@ -805,8 +811,27 @@ RooArgList * CMSHistErrorPropagator::setupBinPars(double poissonThreshold) {
 
       }
       // do the same for the overall correlated sample
-      double v_p = sub_sum_corr;
-      double e_p = sub_err_corr;
+
+      // we need to recompute the correlated error because the computation above
+      // was for the unweighted number of events and signal might not be included.
+      // If we are below pois threshold then we also need to compute the overall 
+      // correlated MC error and assign a gaussian to it
+
+      double v_p = 0.0;
+      std::vector<std::string> keep_procs;
+      for (unsigned i = 0; i < vfuncs_.size(); ++i) {
+        auto samplename = vfuncs_[i]->getStringAttribute("combine.process");
+        if (std::find_if(std::begin(corrsamples_), std::end(corrsamples_), [samplename](const auto& mo) {return mo.second == samplename; }) != std::end(corrsamples_)){        // error skipped but we still want to add the yields because it is not in skipped procs
+          v_p += vfuncs_[i]->cache()[j] * coeffvals_[i];
+          keep_procs.push_back(samplename);
+        }
+      }
+
+      // compute the total correlated error squared
+      sub_err_corr = getBinCorrError(j, {}, keep_procs);
+
+      double e_p = std::sqrt(sub_err_corr);
+      
       std::string proc = "OverallcorrelatedMCsample";
       int i = bintypes_[j].size()-1;
       if (e_p <= 0.) {
