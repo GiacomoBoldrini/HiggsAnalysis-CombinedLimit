@@ -590,11 +590,15 @@ Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<s
         continue;
       }
       // case where we need to compute the sum on a sub-matrix of the correlation matrix (e.g. a datacard bin where not all operators are included)
-      else if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
-        continue;
-      }
-      else if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
-        continue;
+      // if keep procs is empty then we do not do this 
+
+      if (keep_procs.size() > 0){
+        if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
+          continue;
+        }
+        else if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
+          continue;
+        }
       }
 
       auto xsidx = corrsamples_index_[xsample]; 
