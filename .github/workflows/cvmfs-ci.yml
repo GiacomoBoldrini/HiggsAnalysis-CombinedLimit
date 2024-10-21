@@ -24,6 +24,10 @@ jobs:
             CMSSW_VERSION: "CMSSW_14_0_0_pre1" 
             SCRAM_ARCH: "el9_amd64_gcc12"
             ROOT: "ROOT v6.26/11"
+          - IMAGE: "cmscloud/al8-cms"
+            CMSSW_VERSION: "CMSSW_14_2_0_pre2_ROOT632" 
+            SCRAM_ARCH: "el8_amd64_gcc12"
+            ROOT: "ROOT v6.32/06"
     env:
       docker_opt_rw: -v /cvmfs:/cvmfs:shared -v ${{ github.workspace }}:/work/CombinedLimit  --mount source=cmsusr,destination=/home/cmsusr -w /home/cmsusr -e CMSSW_VERSION=${{ matrix.CMSSW_VERSION }} -e SCRAM_ARCH=${{ matrix.SCRAM_ARCH }}
       docker_opt_ro: -v /cvmfs:/cvmfs:shared -v cmsusr:/home/cmsusr/cmssw/:ro -w /home/cmsusr/ -e CMSSW_VERSION=${{ matrix.CMSSW_VERSION }} -e SCRAM_ARCH=${{ matrix.SCRAM_ARCH }}
@@ -65,6 +69,20 @@ jobs:
             cmsenv
             text2workspace.py  HiggsAnalysis/CombinedLimit/data/tutorials/multiDim/toy-hgg-125.txt -m 125 -P HiggsAnalysis.CombinedLimit.PhysicsModel:floatingXSHiggs --PO modes=ggH,qqH
             combine -M MultiDimFit HiggsAnalysis/CombinedLimit/data/tutorials/multiDim/toy-hgg-125.root  --setParameterRanges r=-1,1
+
+      - uses: rhaschke/docker-run-action@v5
+        name: Countind datacard Fixed Point from csv
+        with:
+          image: ${{ matrix.IMAGE }}
+          shell: bash
+          options: ${{env.docker_opt_ro}}
+          run: |
+            cp -r cmssw/${CMSSW_VERSION} .
+            cd /home/cmsusr/${CMSSW_VERSION}/src
+            source /cvmfs/cms.cern.ch/cmsset_default.sh
+            cmsenv
+            text2workspace.py  HiggsAnalysis/CombinedLimit/data/tutorials/multiDim/toy-hgg-125.txt -m 125 -P HiggsAnalysis.CombinedLimit.PhysicsModel:floatingXSHiggs --PO modes=ggH,qqH
+            combineTool.py -M MultiDimFit HiggsAnalysis/CombinedLimit/data/tutorials/multiDim/toy-hgg-125.root --fromfile HiggsAnalysis/CombinedLimit/data/tutorials/multiDim/fixed.csv
 
       - uses: rhaschke/docker-run-action@v5
         name: Parametric analysis

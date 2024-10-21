@@ -150,6 +150,7 @@ MB = None
         print("DC.groups 	= ", self.groups, "#", type(self.groups))
         print("DC.discretes 	= ", self.discretes, "#", type(self.discretes))
         print("DC.pdfnorms 	= ", self.pdfnorms, "#", type(self.pdfnorms))
+        print("DC.toCreateFlatParam = ", self.toCreateFlatParam, "#", type(self.toCreateFlatParam))
 
         print(
             """
@@ -158,7 +159,7 @@ MB = None
 
 options.out 	 = "combine_workspace.root"  	# Output workspace name
 options.fileName = "./" 			# Path to input ROOT files
-options.verbose  = "1" 				# Verbosity
+options.verbose  = 1 				# Verbosity
 
 ##########################################################################
 
