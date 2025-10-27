@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import numpy as np
 
 from HiggsAnalysis.CombinedLimit.PhysicsModel import PhysicsModel
@@ -19,7 +17,7 @@ class Quadratic(PhysicsModel):
     >>> np.save('scales.npy', scales)
 
     Example for running:
-    text2workspace.py ttV.txt -P HiggsAnalysis.CombinedLimit.EFT:quad --PO scaling=scales.npy --PO process=ttZ --PO process=ttW --PO coefficient=cuW -o cuW.root
+    text2workspace.py ttV.txt -P HiggsAnalysis.CombinedLimit.QuadraticScaling:quad --PO scaling=scales.npy --PO process=ttZ --PO process=ttW --PO coefficient=cuW -o cuW.root
     combine -M MultiDimFit cuW.root --setParameterRanges=-4,4
     """
 
@@ -37,10 +35,10 @@ class Quadratic(PhysicsModel):
                 self.scaling = value
 
     def setup(self):
-        scaling = np.load(self.scaling)[()]
+        scaling = np.load(self.scaling, allow_pickle=True)[()]
         for process in self.processes:
             self.modelBuilder.out.var(process)
-            name = "r_{0}_{1}".format(process, self.coefficient)
+            name = f"r_{process}_{self.coefficient}"
             if not self.modelBuilder.out.function(name):
                 template = "expr::{name}('{a0} + ({a1} * {c}) + ({a2} * {c} * {c})', {c})"
                 a0, a1, a2 = scaling[self.coefficient][process]
@@ -49,7 +47,7 @@ class Quadratic(PhysicsModel):
 
     def doParametersOfInterest(self):
         # user should call combine with `--setPhysicsModelParameterRanges` set to sensible ranges
-        self.modelBuilder.doVar("{0}[0, -inf, inf]".format(self.coefficient))
+        self.modelBuilder.doVar(f"{self.coefficient}[0, -inf, inf]")
         self.modelBuilder.doSet("POI", self.coefficient)
         self.setup()
 
@@ -57,7 +55,7 @@ class Quadratic(PhysicsModel):
         if process not in self.processes:
             return 1
         else:
-            name = "r_{0}_{1}".format(process, self.coefficient)
+            name = f"r_{process}_{self.coefficient}"
 
             return name
 

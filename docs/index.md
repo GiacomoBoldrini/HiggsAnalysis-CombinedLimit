@@ -46,12 +46,12 @@ cmsenv
 git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
 cd HiggsAnalysis/CombinedLimit
 ```
-Update to a recommended tag - currently the recommended tag is **v10.0.2**: [see release notes](https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/releases/tag/v10.0.2)
+Update to a recommended tag - currently the recommended tag is **v10.2.1**: [see release notes](https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/releases/tag/v10.2.1)
 
 ```sh
 cd $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit
 git fetch origin
-git checkout v10.0.2
+git checkout v10.2.1
 scramv1 b clean; scramv1 b # always make a clean build
 ```
 
@@ -284,7 +284,7 @@ If you use <span style="font-variant:small-caps;">Combine</span>, please cite th
 <details>
 <summary><b>Show BibTex Entry</b></summary>
 ```
-@unpublished{
+@article{
     CMS:2024onh,
     author = "Hayrapetyan, Aram and others",
     collaboration = "CMS",
@@ -294,7 +294,10 @@ If you use <span style="font-variant:small-caps;">Combine</span>, please cite th
     primaryClass = "physics.data-an",
     reportNumber = "CMS-CAT-23-001, CERN-EP-2024-078",
     year = "2024",
-    note = "Submitted to \textit{Comput. Softw. Big Sci.}"
+    journal = "Comput. Softw. Big Sci.",
+    doi = "10.1007/s41781-024-00121-4",
+    volume = "8",
+    pages = "19"
 }
 ```
 </details>
