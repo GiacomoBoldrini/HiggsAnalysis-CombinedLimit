@@ -120,7 +120,7 @@ if args.translate is not None:
     if args.POI in name_translate:
         fixed_name = name_translate[args.POI]
 
-yvals = [1.0, 4.0]
+yvals = [1.0, 3.84]
 
 
 main_scan = BuildScan(args.output, args.POI, [args.main], args.main_color, yvals, args.y_cut)
