@@ -120,6 +120,8 @@ rateParamsPerCard = []
 extArgs = {}
 binParFlags = {}
 bpf_new2old = {}
+binParFlagsCorr = {}
+bpfCorr_new2old = {}
 nuisanceEdits = []
 constraint_terms = []
 
@@ -280,6 +282,17 @@ for ich, fname in enumerate(args):
         tbin = label if singlebin else label + K
         binParFlags[tbin] = DC.binParFlags[K]
         bpf_new2old[tbin] = K
+    corrFlags = getattr(DC, "binParFlagsCorr", {})
+    if len(corrFlags):
+        for K, corr in corrFlags.items():
+            tbin = label if singlebin else label + K
+            corr_file, corr_hist = corr
+            corr_file = corr_file.replace("$CHANNEL", K)
+            corr_hist = corr_hist.replace("$CHANNEL", K)
+            if corr_file and dirname != "" and not corr_file.startswith("/"):
+                corr_file = os.path.join(dirname, corr_file)
+            binParFlagsCorr[tbin] = (corr_file, corr_hist)
+            bpfCorr_new2old[tbin] = K
     # rate params (sort to provide consistent per-card ordering)
     for K in sorted(DC.rateParams):
         tbin, tproc = K.split("AND")[0], K.split("AND")[1]
@@ -504,6 +517,12 @@ for bpf in binParFlags.keys():
         print("%s autoMCStats %g %i" % (bpf, binParFlags[bpf][0], binParFlags[bpf][1]))
     if len(binParFlags[bpf]) == 3:
         print("%s autoMCStats %g %i %i" % (bpf, binParFlags[bpf][0], binParFlags[bpf][1], binParFlags[bpf][2]))
+
+for bpf in binParFlagsCorr.keys():
+    if isVetoed(bpfCorr_new2old[bpf], options.channelVetos) or not isIncluded(bpfCorr_new2old[bpf], options.channelIncludes):
+        continue
+    corr_file, corr_hist = binParFlagsCorr[bpf]
+    print(f"{bpf} autoMCCorr {corr_file} {corr_hist}")
 
 nuisanceEdits = set(nuisanceEdits)
 nuisanceEdits_lengths = [[len(e.split()), e] for e in nuisanceEdits]
