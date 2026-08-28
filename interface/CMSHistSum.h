@@ -22,15 +22,8 @@ private:
     std::vector<double> dat;
     std::vector<double> valsum;
     std::vector<double> toterr;
-    std::vector<double> err;
-    std::vector<double> b;
-    std::vector<double> c;
-    std::vector<double> tmp;
-    std::vector<double> x1;
-    std::vector<double> x2;
     std::vector<double> res;
     std::vector<double> gobs;
-    std::set<RooAbsArg*> dirty_prop;
     std::vector<RooRealVar*> push_res;
   };
 public:
@@ -80,7 +73,9 @@ public:
 
   void injectExternalMorph(int idx, CMSExternalMorph& morph);
 
- protected:
+  void runBarlowBeeston() const;
+
+protected:
   RooRealProxy x_;
 
   RooListProxy morphpars_;
@@ -142,9 +137,6 @@ public:
   void initialize() const;
   void updateCache() const;
   inline double smoothStepFunc(double x, int const& ip) const;
-
-
-  void runBarlowBeeston() const;
 
   void updateMorphs() const;
 

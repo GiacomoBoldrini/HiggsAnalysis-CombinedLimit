@@ -41,7 +41,7 @@
 #include "../interface/CloseCoutSentry.h"
 #include "../interface/ProfilingTools.h"
 #include "../interface/CombineLogger.h"
-#include "../interface/RooMultiPdf.h"
+#include "../interface/RooMultiPdfCombine.h"
 
 using namespace std;
 
@@ -485,7 +485,12 @@ void utils::copyAttributes(const RooAbsArg &from, RooAbsArg &to) {
 void utils::guessChannelMode(RooSimultaneous &simPdf, RooAbsData &simData, bool verbose) 
 {
     RooAbsCategoryLValue &cat = const_cast<RooAbsCategoryLValue &>(simPdf.indexCat());
-    TList *split = simData.split(cat, kTRUE);
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,37,00)
+    std::vector<std::unique_ptr<RooAbsData>> split{simData.split(cat, kTRUE)};
+#else
+    std::unique_ptr<TList> split{simData.split(cat, kTRUE)};
+    split->SetOwner();
+#endif
     for (int i = 0, n = cat.numBins((const char *)0); i < n; ++i) {
         cat.setBin(i);
         RooAbsPdf *pdf = simPdf.getPdf(cat.getLabel());
@@ -493,7 +498,14 @@ void utils::guessChannelMode(RooSimultaneous &simPdf, RooAbsData &simData, bool 
             if (verbose) std::cout << " - " << cat.getLabel() << " has generation mode already set" << std::endl;
             continue;
         }
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,37,00)
+        auto found = std::find_if(split.begin(), split.end(), [&](auto const &item) {
+          return std::string{cat.getLabel()} == item->GetName();
+        });
+        RooAbsData *spl = found != split.end() ? found->get() : nullptr;
+#else
         RooAbsData *spl = (RooAbsData *) split->FindObject(cat.getLabel());
+#endif
         if (spl == 0) { 
             if (verbose) std::cout << " - " << cat.getLabel() << " has no dataset, cannot guess" << std::endl; 
             continue;
@@ -589,11 +601,16 @@ utils::makePlots(const RooAbsPdf &pdf, const RooAbsData &data, const char *signa
     if (id == typeid(RooSimultaneous) || id == typeid(RooSimultaneousOpt)) {
         const RooSimultaneous *sim  = dynamic_cast<const RooSimultaneous *>(&pdf);
         const RooAbsCategoryLValue &cat = (RooAbsCategoryLValue &) sim->indexCat();
-        TList *datasets = data.split(cat, true);
-        TIter next(datasets);
+#if ROOT_VERSION_CODE >= ROOT_VERSION(6,37,00)
+        for (std::unique_ptr<RooAbsData> const& ds : data.split(cat, true)) {
+#else
+        std::unique_ptr<TList> datasets{data.split(cat, true)};
+        datasets->SetOwner();
+        TIter next(datasets.get());
         for (RooAbsData *ds = (RooAbsData *) next(); ds != 0; ds = (RooAbsData *) next()) {
+#endif
             RooAbsPdf *pdfi  = sim->getPdf(ds->GetName());
-            std::unique_ptr<RooArgSet> obs(pdfi->getObservables(ds));
+            std::unique_ptr<RooArgSet> obs(pdfi->getObservables(ds->get()));
             if (obs->getSize() == 0) break;
         for (RooAbsArg *a : *obs) {
 	      RooRealVar *x = dynamic_cast<RooRealVar *>(a);
@@ -614,7 +631,6 @@ utils::makePlots(const RooAbsPdf &pdf, const RooAbsData &data, const char *signa
 	      else ds->plotOn(ret.back(), RooFit::DataError(RooAbsData::Poisson),RooFit::Binning(""));
 	    }
         }
-        delete datasets;
     } else if (pdf.canBeExtended()) {
         std::unique_ptr<RooArgSet> obs(pdf.getObservables(&data));
 
@@ -746,6 +762,16 @@ void utils::setModelParameters( const std::string & setPhysicsModelParameterExpr
                 std::smatch match;
                 if (std::regex_match(target, match, rgx)) {
                     double PhysicsParameterValue = atof(SetParameterExpression[1].c_str());
+                    if (PhysicsParameterValue < tmpParameter->getMin() ||
+                        PhysicsParameterValue > tmpParameter->getMax()) {
+                      throw std::runtime_error(
+                          Form("Parameter %s value %g is outside its range [%g, %g]. "
+                               "Use --rMin/--rMax or --setParameterRanges to adjust the range.",
+                               target.c_str(),
+                               PhysicsParameterValue,
+                               tmpParameter->getMin(),
+                               tmpParameter->getMax()));
+                    }
                     cout << "Set Default Value of Parameter " << target
                      << " To : " << PhysicsParameterValue << "\n";
                     tmpParameter->setVal(PhysicsParameterValue);
@@ -775,8 +801,17 @@ void utils::setModelParameters( const std::string & setPhysicsModelParameterExpr
         if (isrvar) {
           RooRealVar *tmpParameter = dynamic_cast<RooRealVar*>(tmp);
           double PhysicsParameterValue = atof(SetParameterExpression[1].c_str());
-          cout << "Set Default Value of Parameter " << SetParameterExpression[0] 
-               << " To : " << PhysicsParameterValue << "\n";
+          if (PhysicsParameterValue < tmpParameter->getMin() || PhysicsParameterValue > tmpParameter->getMax()) {
+            throw std::runtime_error(
+                Form("Parameter %s value %g is outside its range [%g, %g]. "
+                     "Use --rMin/--rMax or --setParameterRanges to adjust the range.",
+                     SetParameterExpression[0].c_str(),
+                     PhysicsParameterValue,
+                     tmpParameter->getMin(),
+                     tmpParameter->getMax()));
+          }
+          cout << "Set Default Value of Parameter " << SetParameterExpression[0] << " To : " << PhysicsParameterValue
+               << "\n";
           tmpParameter->setVal(PhysicsParameterValue);
         } else {
           RooCategory *tmpCategory  = dynamic_cast<RooCategory*>(tmp);
@@ -839,7 +874,8 @@ void utils::setModelParameterRanges( const std::string & setPhysicsModelParamete
       if (tmpParameter) {
         cout << "Leave Parameter " << SetParameterRangeExpression[0] 
              << " freely floating, with no range\n";
-        tmpParameter->removeRange();
+        tmpParameter->removeMin();
+        tmpParameter->removeMax();
       } else {
         std::cout << "Warning: Did not find a parameter with name " << SetParameterRangeExpression[0] << endl;
       }
@@ -895,11 +931,10 @@ void utils::check_inf_parameters(const RooArgSet & params, int verbosity) {
                 std::cout << "Found a parameter named "<< p->GetName()
                           << " infinite in ROOT versions < 6.30, going to update the ranges to take into account the new definition of infinity in ROOT v6.30" << endl;
             }
-            if (p->getRange().first <= -infinity_root626 && p->getRange().second >= +infinity_root626) {
-              p->removeRange();
-            } else if (p->getRange().second >= +infinity_root626) {
+            if (p->getRange().second >= +infinity_root626) {
               p->removeMax();
-            } else {
+            }
+            if (p->getRange().first <= -infinity_root626) {
               p->removeMin();
             }
         }

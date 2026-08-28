@@ -1,8 +1,6 @@
 import re
 from abc import ABCMeta, abstractmethod
 
-import six
-
 ### Class that takes care of building a physics model by combining individual channels and processes together
 ### Things that it can do:
 ###   - define the parameters of interest (in the default implementation , "r")
@@ -103,8 +101,10 @@ class PhysicsModel(PhysicsModelBase):
         # --- Higgs Mass as other parameter ----
         if self.options.mass != 0:
             if self.modelBuilder.out.var("MH"):
-                self.modelBuilder.out.var("MH").removeRange()
-                self.modelBuilder.out.var("MH").setVal(self.options.mass)
+                var = self.modelBuilder.out.var("MH")
+                var.removeMin()
+                var.removeMax()
+                var.setVal(self.options.mass)
             else:
                 self.modelBuilder.doVar("MH[%g]" % self.options.mass)
 
@@ -133,7 +133,7 @@ class MultiSignalModelBase(PhysicsModelBase_NiceSubclasses):
                 self.verbose = True
                 processed.append(po)
             if po.startswith("map="):
-                (maplist, poi) = po.replace("map=", "").split(":", 1)
+                maplist, poi = po.replace("map=", "").split(":", 1)
                 maps = maplist.split(",")
                 poiname = re.sub(r"\[.*", "", poi)
                 if poi == "super":
@@ -251,8 +251,10 @@ class HiggsMassRangeModel(PhysicsModelBase_NiceSubclasses):
                 poiNames += ["MH"]
             else:
                 print("MH will be assumed to be", self.options.mass)
-                self.modelBuilder.out.var("MH").removeRange()
-                self.modelBuilder.out.var("MH").setVal(self.options.mass)
+                var = self.modelBuilder.out.var("MH")
+                var.removeMin()
+                var.removeMax()
+                var.setVal(self.options.mass)
         else:
             if len(self.mHRange):
                 print(
@@ -300,7 +302,7 @@ def getHiggsProdDecMode(bin, process, options):
     processSource = process
     decaySource = options.fileName + ":" + bin  # by default, decay comes from the datacard name or bin label
     if "_" in process:
-        (processSource, decaySource) = (
+        processSource, decaySource = (
             process.split("_")[0],
             process.split("_")[-1],
         )  # ignore anything in the middle for SM-like higgs
@@ -351,7 +353,7 @@ class SMLikeHiggsModel(PhysicsModel):
         "Split in production and decay, and call getHiggsSignalYieldScale; return 1 for backgrounds"
         if not self.DC.isSignal[process]:
             return 1
-        (processSource, foundDecay, foundEnergy) = getHiggsProdDecMode(bin, process, self.options)
+        processSource, foundDecay, foundEnergy = getHiggsProdDecMode(bin, process, self.options)
         return self.getHiggsSignalYieldScale(processSource, foundDecay, foundEnergy)
 
 
@@ -513,8 +515,10 @@ class FloatingXSHiggs(SMLikeHiggsModel):
                 poi += ",MH"
             else:
                 print("MH will be assumed to be", self.options.mass)
-                self.modelBuilder.out.var("MH").removeRange()
-                self.modelBuilder.out.var("MH").setVal(self.options.mass)
+                var = self.modelBuilder.out.var("MH")
+                var.removeMin()
+                var.removeMax()
+                var.setVal(self.options.mass)
         else:
             if len(self.mHRange):
                 print(
@@ -602,7 +606,7 @@ class FloatingBRHiggs(SMLikeHiggsModel):
             if po.startswith("modes="):
                 self.modes = po.replace("modes=", "").split(",")
             if po.startswith("map="):
-                (mfrom, mto) = po.replace("map=", "").split(":")
+                mfrom, mto = po.replace("map=", "").split(":")
                 self.modemap[mfrom] = mto
             if po.startswith("higgsMassRange="):
                 self.mHRange = po.replace("higgsMassRange=", "").split(",")
@@ -631,8 +635,10 @@ class FloatingBRHiggs(SMLikeHiggsModel):
                 poi += ",MH"
             else:
                 print("MH will be assumed to be", self.options.mass)
-                self.modelBuilder.out.var("MH").removeRange()
-                self.modelBuilder.out.var("MH").setVal(self.options.mass)
+                var = self.modelBuilder.out.var("MH")
+                var.removeMin()
+                var.removeMax()
+                var.setVal(self.options.mass)
         else:
             if len(self.mHRange):
                 print(
@@ -788,6 +794,7 @@ class FloatingXSBRHiggs(SMLikeHiggsModel):
         """Create POI and other parameters, and define the POI set."""
         # --- Higgs Mass as other parameter ----
         if self.modelBuilder.out.var("MH"):
+            var = self.modelBuilder.out.var("MH")
             if len(self.mHRange):
                 print(
                     "MH will be left floating within",
@@ -795,13 +802,14 @@ class FloatingXSBRHiggs(SMLikeHiggsModel):
                     "and",
                     self.mHRange[1],
                 )
-                self.modelBuilder.out.var("MH").setRange(float(self.mHRange[0]), float(self.mHRange[1]))
-                self.modelBuilder.out.var("MH").setConstant(False)
+                var.setRange(float(self.mHRange[0]), float(self.mHRange[1]))
+                var.setConstant(False)
                 self.poiNames += ["MH"]
             else:
                 print("MH will be assumed to be", self.options.mass)
-                self.modelBuilder.out.var("MH").removeRange()
-                self.modelBuilder.out.var("MH").setVal(self.options.mass)
+                var.removeMin()
+                var.removeMax()
+                var.setVal(self.options.mass)
         else:
             if len(self.mHRange):
                 print(

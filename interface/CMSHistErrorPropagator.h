@@ -83,6 +83,8 @@ public:
   
   std::map<std::string, Double_t> getProcessNorms() const;
 
+  void runBarlowBeeston() const;
+
   friend class CMSHistV<CMSHistErrorPropagator>;
 
  protected:
@@ -176,9 +178,6 @@ public:
   void updateCache(int eval = 1) const;
 
   Double_t getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs, std::vector<std::string> keep_procs = {}) const;
-
-  void runBarlowBeeston() const;
-
 
  private:
   ClassDefOverride(CMSHistErrorPropagator,1)

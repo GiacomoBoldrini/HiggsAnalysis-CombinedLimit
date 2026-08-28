@@ -121,7 +121,7 @@ combine -M MultiDimFit datacard.txt --algo grid --points 100 --rMin -2 --rMax 6
 The results can then be plotted using the `plot1Dscan.py` script, using the file `higgsCombineTest.MultiDimFit.mH120.root` which was output by the scan:
 
 ```
-python3 ../../../scripts/plot1DScan.py --POI r higgsCombineTest.MultiDimFit.mH120.root
+plot1DScan.py --POI r higgsCombineTest.MultiDimFit.mH120.root
 ```
 
 it should produce an output pdf and png files which look like the one shown below.
@@ -204,6 +204,10 @@ combine -M MultiDimFit datacard.txt --rMin -10 --rMax 10 --algo fixed --fixedPoi
 Test out a few values of `r` and see if they all give you the same result. 
 What happens for `r` less than about -1? Can you explain why? (hint: look at the values in the datacard)
 
+**Note**: if you are running the toys generation and fitting commands separately, remember to always set the range to include the value you are setting. If you don't, Roofit will clip the value of `r` to the nearest boundary, and you could see unexpected results.
+
+**Advanced**: if you run the command above for a set of points in the range [-2, 6] (the same one used in the scan before), you can build the line of critical values for $t_{\mu}$ and check where the crossing of the observed likelihood scan is in order to find the confidence interval. Try to do that and compare it to the one we derived earlier using Wilks' theorem.
+If you need help, take a look at the code in `plot_scan_with_quantile_solution.py`.
 
 ## Significance Testing
 
@@ -224,7 +228,7 @@ So for positive values of $\hat{r}$ we can read the Significance from the likeli
 
 ```
 combine -M MultiDimFit datacard.txt --algo grid --points 100 --rMin -0.1 --rMax 1
-python3 ../../../scripts/plot1DScan.py --POI r higgsCombineTest.MultiDimFit.mH120.root --y-max 0.5
+plot1DScan.py --POI r higgsCombineTest.MultiDimFit.mH120.root --y-max 0.5
 ```
 
 This will produce the same likelihood scan as before, but where we've restricted the range to be able to see the value of the curve at `r` = 0 more clearly.
@@ -271,7 +275,7 @@ Let's see what happens if we were to have observed 12 events instead of 6. There
 
 ```
 combine -M MultiDimFit datacard_obs12.txt --algo grid --points 100 --rMin -2 --rMax 8
-python3 ../../../scripts/plot1DScan.py --POI r higgsCombineTest.MultiDimFit.mH120.root
+plot1DScan.py --POI r higgsCombineTest.MultiDimFit.mH120.root
 ```
 
 ![](llhood_scan_obs12.png)
@@ -397,9 +401,12 @@ combine -M HybridNew --LHCmode LHC-limits --plot r_scan.png datacard.txt
 
 ![](r_scan.png)
 
+Questions:
 
 - Where do the uncertainties on the CLs value at each value of `r` come from in the plot?
 - How could the precision of the limit be increased?
+
+(hint: read through [this section](../part3/commonstatsmethods.md#computing-limits-with-toys) and look for the adaptive sampling procedure)
 
 ### Debugging
 

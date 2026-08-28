@@ -90,6 +90,14 @@ hadd limits.root higgsCombine*.AsymptoticLimits.*
 
 combine -M AsymptoticLimits realistic-counting-experiment.txt --getLimitFromGrid limits.root
 ```
+## Expected limits assuming non-zero signal strengths
+
+The median expected limit and quantiles can be calculated under Hypotheses other than at $\mu=0$. The Asymptotic expected limits can be calculated by setting the value `--signalStrengthForExpected mu0`. The Asimov dataset produced for the calculation will be generated for $\mu=$`mu0` instead of the usual $\mu=0$. Note that setting ` --signalStrengthForExpected 0` will give the same results as not setting the option, but will be slower as this forces a recreation of the Asimov dataset.
+
+Be aware that while expected values are derived from the Asimov created at the specified signal strength, setting this option *does not* alter the definition of $CL_s$ in that the denominator is still defined with respect to the no signal ($\mu=0$) hypothesis. 
+
+!!! info
+    Currently <span style="font-variant:small-caps;">Combine</span> does *not* support calculating expected limits assuming non-zero signal strengths using toy-based calculations. If you are interested in adding this feature, please contact the developers.
 
 ## Asymptotic Significances
 
@@ -182,80 +190,51 @@ Done in 0.14 min (cpu), 0.15 min (real)
 
 Again, the resulting limit tree will contain the result. You can also save the chains using the option `--saveChain`, which will then also be included in the output file.
 
-Exclusion regions can be made from the posterior once an ordering principle is defined to decide how to grow the contour (there is an infinite number of possible regions that contain 68% of the posterior pdf). Below is a simple example script that can be used to plot the posterior distribution from these chains and calculate the *smallest* such region. Note that in this example we are ignoring the burn-in. This can be added by e.g. changing `for i in range(mychain.numEntries()):` to `for i in range(200,mychain.numEntries()):` for a burn-in of 200.
+Exclusion regions can be made from the posterior once an ordering principle is defined to decide how to grow the contour (there is an infinite number of possible regions that contain 68% of the posterior pdf). Below is a snippet that can be used access the chains from the output of `MarkovChainMC`.
 
-/// details | **Show example script**
+/// details | **Show example snippet**
 <pre class="python"><code>
 import ROOT
 
-rmin = 0
-rmax = 30
-nbins = 100
-CL = 0.95
-chains = "higgsCombineTest.MarkovChainMC.blahblahblah.root"
-
-def findSmallestInterval(hist,CL):
- bins = hist.GetNbinsX()
- best_i = 1
- best_j = 1
- bd = bins+1
- val = 0;
- for i in range(1,bins+1):
-   integral = hist.GetBinContent(i)
-   for j in range(i+1,bins+2):
-    integral += hist.GetBinContent(j)
-    if integral > CL :
-      val = integral
-      break
-   if integral > CL and  j-i < bd :
-     bd = j-i
-     best_j = j+1
-     best_i = i
-     val = integral
- return hist.GetBinLowEdge(best_i), hist.GetBinLowEdge(best_j), val
-
+chains = "higgsCombineTest.MarkovChainMC.mH120.root"
 fi_MCMC = ROOT.TFile.Open(chains)
-# Sum up all of the chains (or we could take the average limit)
-mychain=0
+
+param = "r"
+param_vals 	  = []
+param_weights = []
+
 for k in fi_MCMC.Get("toys").GetListOfKeys():
     obj = k.ReadObj
-    if mychain ==0:
-        mychain = k.ReadObj().GetAsDataSet()
-    else :
-        mychain.append(k.ReadObj().GetAsDataSet())
-hist = ROOT.TH1F("h_post",";r;posterior probability",nbins,rmin,rmax)
-for i in range(mychain.numEntries()):
-#for i in range(200,mychain.numEntries()): burn-in of 200
-  mychain.get(i)
-  hist.Fill(mychain.get(i).getRealValue("r"), mychain.weight())
-hist.Scale(1./hist.Integral())
-hist.SetLineColor(1)
-vl,vu,trueCL = findSmallestInterval(hist,CL)
-histCL = hist.Clone()
-for b in range(nbins):
-  if histCL.GetBinLowEdge(b+1) < vl or histCL.GetBinLowEdge(b+2)>vu: histCL.SetBinContent(b+1,0)
-c6a = ROOT.TCanvas()
-histCL.SetFillColor(ROOT.kAzure-3)
-histCL.SetFillStyle(1001)
-hist.Draw()
-histCL.Draw("histFsame")
-hist.Draw("histsame")
-ll = ROOT.TLine(vl,0,vl,2*hist.GetBinContent(hist.FindBin(vl))); ll.SetLineColor(2); ll.SetLineWidth(2)
-lu = ROOT.TLine(vu,0,vu,2*hist.GetBinContent(hist.FindBin(vu))); lu.SetLineColor(2); lu.SetLineWidth(2)
-ll.Draw()
-lu.Draw()
-
-print " %g %% (%g %%) interval (target)  = %g < r < %g "%(trueCL,CL,vl,vu)
+    mychain = k.ReadObj().GetAsDataSet()
+    for i in range(mychain.numEntries()):
+		mychain.get(i)
+  		param_vals.append(mychain.get(i).getRealValue(param))
+		param_weights.append(mychain.weight())
+	   
 </code></pre>
 ///
 
-Running the script on the output file produced for the same datacard (including the `--saveChain` option) will produce the following output
+Alternatively, you can use the script provided `debugChains.py` to produce the posterior distribution and some examples of trace plots of the chains. 
+Running the following command on the output file produced for the same datacard (including the `--saveChain` option) 
 
-	0.950975 % (0.95 %) interval (target)  = 0 < r < 2.2
+```nohighlight 
+debugChains.py higgsCombineTest.MarkovChainMC.mH120.root --burnInFraction 0.2 -p r  --range 0 20 --mode upperlim
+```
+will produce the following output,
 
-along with a plot of the posterior distribution shown below. This is the same as the output from <span style="font-variant:small-caps;">Combine</span>, but the script can also be used to find lower limits (for example) or credible intervals.
+```nohighlight
+Average chain length: 782.5
+Number of chains: 100
+Burn-in fraction: 0.20 (average burn-in length: 156.5 entries)
+95.0% CL interval: r < 2.173
+```
+
+along with a plot of the plot shown below. This is roughly the same as the output from <span style="font-variant:small-caps;">Combine</span>, but the script can also be used to find lower limits, or credible intervals by setting the option `--mode`. 
 
 ![](images/bayes1D.png)
+
+!!! warning
+    The options below for burn-in have no effect on the chains that are saved in the output. In the example above, we have an added burn-in through ignoring the first 20% of the steps by including the option `--burnInFraction=0.2` as an argument to `debugChains.py`.
 
 An example to make contours when ordering by probability density can be found in [bayesContours.cxx](https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit/blob/main/test/multiDim/bayesContours.cxx). Note that the implementation is simplistic, with no clever handling of bin sizes nor smoothing of statistical fluctuations.
 
@@ -267,7 +246,7 @@ Three parameters control how the MCMC integration is performed:
 
 -   the number of **tries** (option `--tries`): the algorithm will run multiple times with different random seeds. The truncated mean and RMS of the different results are reported. The default value is 10, which should be sufficient for a quick computation. For a more accurate result you might want to increase this number up to even ~200.
 -   the number of **iterations** (option `-i`) determines how many points are proposed to fill a single Markov Chain. The default value is 10k, and a plausible range is between 5k (for quick checks) and 20-30k for lengthy calculations. Beyond 30k, the time vs accuracy can be balanced better by increasing the number of chains (option `--tries`).
--   the number of **burn-in steps** (option `-b`) is the number of points that are removed from the beginning of the chain before using it to compute the limit. The default is 200. If the chain is very long, we recommend to increase this value a bit (e.g. to several hundreds). Using a number of burn-in steps below 50 is likely to result in a bias towards earlier stages of the chain before a reasonable convergence.
+-   the number of **burn-in steps** (option `-b`) is the number of points that are removed from the beginning of the chain before using it to compute the limit. The default is 200. If the chain is very long, we recommend to increase this value a bit (e.g. to several hundreds). Using a number of burn-in steps below 50 is likely to result in a bias towards earlier stages of the chain before a reasonable convergence. Instead of a fixed number, the option `--burnInFraction=x` can be set to a value between 0 and 1 to ignore a fraction `x` of the start of each chain. The larger of the option `b` and `x*length_of_chain` will be used as the burn-in. 
 
 #### Proposals
 
@@ -557,6 +536,8 @@ For complicated models, it is best to produce a *grid* of test statistic distrib
 ```sh
 combine datacard.txt -M HybridNew --LHCmode LHC-limits --singlePoint X --saveToys --saveHybridResult -T 500 --clsAcc 0
 ```
+
+**N.B. The maximum signal strength is set to 20 by default. Hence, if X is greater than 20, the option `--rMax X1` (where X1 is any value greater than or equal to X) needs to be added to the above command.**
 
 !!! warning
     We have specified the accuracy here by including `--clsAcc=0`, which turns off adaptive sampling, and specifying the number of toys to be 500 with the `-T N` option. For complex models, it may be necessary to internally split the toys over a number of instances of `HybridNew` using the option `--iterations I`. The **total** number of toys will be the product **I*N**.

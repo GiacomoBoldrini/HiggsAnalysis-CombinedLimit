@@ -1,6 +1,3 @@
-import six
-
-
 class Datacard:
     """
     Description:
@@ -74,8 +71,7 @@ class Datacard:
         """
         Print the contents of the container -> should allow for direct text2workspace on python config
         """
-        print(
-            """
+        print("""
 from HiggsAnalysis.CombinedLimit.DatacardParser import *
 from HiggsAnalysis.CombinedLimit.ModelTools import *
 from HiggsAnalysis.CombinedLimit.ShapeTools import *
@@ -92,8 +88,7 @@ DC = Datacard()
 MB = None
 
 ############## Setup the datacard (must be filled in) ###########################
-"""
-        )
+""")
 
         print("DC.bins = 	", self.bins, "#", type(self.bins))
         print("DC.obs = 	", self.obs, "#", type(self.obs))
@@ -150,8 +145,7 @@ MB = None
         print("DC.pdfnorms 	= ", self.pdfnorms, "#", type(self.pdfnorms))
         print("DC.toCreateFlatParam = ", self.toCreateFlatParam, "#", type(self.toCreateFlatParam))
 
-        print(
-            """
+        print("""
 
 ###### User defined options #############################################
 
@@ -169,8 +163,7 @@ else:
 # Set physics models
 MB.setPhysics(defaultModel)
 MB.doModel()
-"""
-        )
+""")
 
         # map of which bins should have automated Barlow-Beeston parameters
         self.binParFlags = {}

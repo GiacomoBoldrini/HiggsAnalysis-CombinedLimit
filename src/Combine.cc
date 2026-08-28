@@ -59,7 +59,7 @@
 #include "../interface/AsimovUtils.h"
 #include "../interface/CascadeMinimizer.h"
 #include "../interface/ProfilingTools.h"
-#include "../interface/RooMultiPdf.h"
+#include "../interface/RooMultiPdfCombine.h"
 #include "../interface/CMSHistFunc.h"
 #include "../interface/CMSHistSum.h"
 
@@ -76,7 +76,8 @@ Float_t g_quantileExpected_ = -1.0;
 TDirectory *outputFile = 0;
 TDirectory *writeToysHere = 0;
 TDirectory *readToysFromHere = 0;
-int  verbose = 1;
+int verbose = 1;
+int pickToy_ = 0;
 bool withSystematics = 1;
 bool expectSignalSet_ = false;
 bool doSignificance_ = 0;
@@ -289,7 +290,7 @@ std::string Combine::parseRegex(std::string instr, const RooArgSet *nuisances, R
 }
 
 bool Combine::mklimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::ModelConfig *mc_b, RooAbsData &data, double &limit, double &limitErr) {
-  TStopwatch timer;
+  //TStopwatch timer;
 
   bool ret = false;
   try {
@@ -317,8 +318,13 @@ bool Combine::mklimit(RooWorkspace *w, RooStats::ModelConfig *mc_s, RooStats::Mo
     std::cout << "  --- MODEL ---\n";
     w->Print("V");
   } */
-  timer.Stop(); t_cpu_ = timer.CpuTime()/60.; t_real_ = timer.RealTime()/60.;
-  printf("Done in %.2f min (cpu), %.2f min (real)\n", t_cpu_, t_real_);
+
+  // Printing out the time it took to run combine might seem useful, but it is
+  // problematic for automatic validation because the output is "random".
+
+  // timer.Stop(); t_cpu_ = timer.CpuTime()/60.; t_real_ = timer.RealTime()/60.;
+  // printf("Done in %.2f min (cpu), %.2f min (real)\n", t_cpu_, t_real_);
+
   return ret;
 }
 
@@ -501,7 +507,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
       if (w->var("MH")) mass_ = w->var("MH")->getVal();
     }
     // look for parameters ranged [-1e+30, 1e+30], corresponding to the old definition of unlimited parameters, 
-    // since ROOT v6.30 have to removeRange() to keep them unlimited
+    // since ROOT v6.30 have to removeMin() and removeMax() to keep them unlimited
     utils::check_inf_parameters(w->allVars(), verbose);
 
   } else {
@@ -628,7 +634,7 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
       if (floatNuisances_=="all") {
           toFloat.add(*nuisances);
       } else {
-          std::vector<std::string> nuisToFloat = Utils::split(floatNuisances_, "n");
+          std::vector<std::string> nuisToFloat = Utils::split(floatNuisances_, ",");
           for (int k=0; k<(int)nuisToFloat.size(); k++) {
               if (nuisToFloat[k]=="") continue;
               else if(nuisToFloat[k]=="all") {
@@ -798,7 +804,13 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
   if (freezeAllGlobalObs_ && mc_bonly && mc_bonly->GetGlobalObservables()) utils::setAllConstant(*mc_bonly->GetGlobalObservables(), true);
 
   // Setup the CascadeMinimizer with discrete nuisances 
-  addDiscreteNuisances(w);
+  bool wsHasDiscretes = addDiscreteNuisances(w);
+
+  // Add a check that we're not trying to use discrete profiling with Bayesian methods 
+  if ((algo->name() == "BayesianSimple" || algo->name() == "MarkovChainMC") && wsHasDiscretes){
+      throw std::invalid_argument("Cannot currently use discrete parameters with Bayesian methods. Either remove discrete parameters or remove runtime def option ADD_DISCRETE_FALLBACK");
+  }
+
   // and give him the regular nuisances too
   addNuisances(nuisances);
   addFloatingParameters(w->allVars());
@@ -1021,6 +1033,8 @@ void Combine::run(TString hlfFile, const std::string &dataset, double &limit, do
     algo->setNToys(nToys);
 
     for (iToy = 1; iToy <= nToys; ++iToy) {
+      if ((pickToy_ != 0) && (iToy != pickToy_))
+        continue;
 
       // Reset ranges --> for likelihood scans
       if (setPhysicsModelParameterRangeExpression_ != "") {
@@ -1143,6 +1157,8 @@ void Combine::toggleGlobalFillTree(bool flag){
    g_fillTree_ = flag;
 }
 
+void Combine::setPickToy(int pickToy) { pickToy_ = pickToy; }
+
 void Combine::commitPoint(bool expected, float quantile) {
     Float_t saveQuantile =  g_quantileExpected_;
     g_quantileExpected_ = quantile;
@@ -1184,17 +1200,20 @@ void Combine::addFloatingParameters(const RooArgSet &parameters){
 	 if (! arg->isConstant()) (CascadeMinimizerGlobalConfigs::O().allFloatingParameters).add(*arg);
         }
 }
-void Combine::addDiscreteNuisances(RooWorkspace *w){
+bool Combine::addDiscreteNuisances(RooWorkspace *w){
 
+    // return value 
+    bool hasDiscrete = false;
     RooArgSet *discreteParameters = (RooArgSet*) w->genobj("discreteParams");
  
     CascadeMinimizerGlobalConfigs::O().pdfCategories = RooArgList();
     CascadeMinimizerGlobalConfigs::O().allRooMultiPdfParams = RooArgList();
-
+    // Check for the discrete parameters 
     if (discreteParameters != 0) {
         for (RooAbsArg *arg : *discreteParameters) {
           RooCategory *cat = dynamic_cast<RooCategory*>(arg);
           if (cat && (!cat->isConstant() || runtimedef::get("ADD_DISCRETE_FALLBACK"))) {
+	        hasDiscrete = true;
 	        if (verbose){
               //std::cout << "Adding discrete " << cat->GetName() << "\n";
       	      CombineLogger::instance().log("Combine.cc",__LINE__,std::string(Form("Adding discrete %s ",cat->GetName())),__func__);
@@ -1210,6 +1229,7 @@ void Combine::addDiscreteNuisances(RooWorkspace *w){
          RooCategory *cat = dynamic_cast<RooCategory*>(arg);
          if (! (std::string(cat->GetName()).find("pdfindex") != std::string::npos )) continue;
          if (cat/* && !cat->isConstant()*/) {
+	       hasDiscrete = true;
 	       if (verbose){
               //std::cout << "Adding discrete " << cat->GetName() << "\n";
       	      CombineLogger::instance().log("Combine.cc",__LINE__,std::string(Form("Adding discrete %s ",cat->GetName())),__func__);
@@ -1218,6 +1238,7 @@ void Combine::addDiscreteNuisances(RooWorkspace *w){
          }
 	}
     }
+    
     // Now lets go through the list of parameters which are associated to this discrete nuisance
     RooArgSet clients;
     utils::getClients(CascadeMinimizerGlobalConfigs::O().pdfCategories,(w->allPdfs()),clients);
@@ -1231,6 +1252,7 @@ void Combine::addDiscreteNuisances(RooWorkspace *w){
 	if (! (v->isConstant())) (CascadeMinimizerGlobalConfigs::O().allRooMultiPdfParams).add(*v) ;
       }
     }
+    return hasDiscrete;
 }
 
 template <class Var>

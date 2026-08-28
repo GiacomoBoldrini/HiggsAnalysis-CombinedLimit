@@ -5,8 +5,6 @@ import re
 from optparse import OptionParser
 from sys import argv, exit
 
-import six
-
 from HiggsAnalysis.CombinedLimit.DatacardParser import *
 
 parser = OptionParser(
@@ -90,8 +88,17 @@ parser.add_option(
     action="store_true",
     help="Drop regularization terms that would not be correctly combined.",
 )
+parser.add_option(
+    "--keyword-value",
+    default=[],
+    nargs=1,
+    type="string",
+    action="append",
+    dest="modelparams",
+    help="Expand keyword using string provided - eg MASS=120.0. Repeat for multiple keywords",
+)
 
-(options, args) = parser.parse_args()
+options, args = parser.parse_args()
 options.bin = True  # fake that is a binary output, so that we parse shape lines
 options.nuisancesToExclude = []
 options.verbose = 0
@@ -124,6 +131,26 @@ nuisanceEdits = []
 constraint_terms = []
 
 
+def replace_keywords_single(shapeline):
+    if "$" not in shapeline:
+        return shapeline
+    for mp in options.modelparams:
+        if "=" not in mp:
+            raise RuntimeError(f"Malformed --keyword-value '{mp}'. Expected KEY=VALUE.")
+        mpname, mpv = mp.split("=", 1)
+        shapeline = shapeline.replace(f"${mpname}", mpv)
+    return shapeline
+
+
+def replace_keywords(list_shapelines):
+    if not options.modelparams:
+        return list_shapelines
+    return_list = []
+    for sp in list_shapelines:
+        return_list.append(replace_keywords_single(sp))
+    return return_list
+
+
 def compareParamSystLines(a, b):
     if float(a[0]) != float(b[0]):
         return False
@@ -148,7 +175,7 @@ if not args:
 for ich, fname in enumerate(args):
     label = "ch%d" % (ich + 1)
     if "=" in fname:
-        (label, fname) = fname.split("=")
+        label, fname = fname.split("=")
     fname = options.fprefix + fname
     dirname = os.path.dirname(fname)
     if fname.endswith(".gz"):
@@ -228,7 +255,7 @@ for ich, fname in enumerate(args):
                             constraint_terms.append(line)
                     warnings.warn(warning_message, RuntimeWarning)
                     break
-                if type(errline[b][p]) == list:
+                if isinstance(errline[b][p], list):
                     r = "{}/{}".format(
                         FloatToString(errline[b][p][0]),
                         FloatToString(errline[b][p][1]),
@@ -241,7 +268,7 @@ for ich, fname in enumerate(args):
                     cmax = len(r)  # get max col length, as it's more tricky to do it later with a map
                 systeffect[bout][p] = r
         if lsyst in systlines:
-            (otherpdf, otherargs, othereffect, othernofloat) = systlines[lsyst]
+            otherpdf, otherargs, othereffect, othernofloat = systlines[lsyst]
             if otherpdf != pdf:
                 if pdf == "lnN" and otherpdf.startswith("shape"):
                     if systlines[lsyst][0][-1] != "?":
@@ -394,6 +421,15 @@ for b, p, s in keyline:
 if process_errors:
     raise RuntimeError("ERROR: mismatch between process signal labels:\n%s" % ("\n".join(process_errors)))
 
+# Remove systematics that don't affect any process/channel in the combination
+removed_systs = {name for name, (pdf, pdfargs, effect, nofloat) in systlines.items() if not any(effect.get(b, {}).get(p, "-") != "-" for b, p, s in keyline)}
+for name in removed_systs:
+    del systlines[name]
+
+# Remove pruned systematics from groups - leave all other group members untouched
+if removed_systs:
+    groups = {gname: nuisanceNames - removed_systs for gname, nuisanceNames in groups.items() if nuisanceNames - removed_systs}
+
 print("Combination of", "  ".join(args))
 print("imax %d number of bins" % len(bins))
 print("jmax %d number of processes minus 1" % (len(signals) + len(backgrounds) - 1))
@@ -405,6 +441,7 @@ if shapeLines:
     cfmt = "%-" + str(chmax) + "s "
     shapeLines.sort(key=lambda x: (x[1], x[0]))
     for process, channel, stuff in shapeLines:
+        stuff = replace_keywords(stuff)
         print("shapes", cfmt % process, cfmt % channel, " ".join(stuff))
     print("-" * 130)
 
@@ -447,7 +484,7 @@ print("-" * 130)
 sysnamesSorted = list(systlines.keys())
 sysnamesSorted.sort()
 for name in sysnamesSorted:
-    (pdf, pdfargs, effect, nofloat) = systlines[name]
+    pdf, pdfargs, effect, nofloat = systlines[name]
     if nofloat:
         name += "[nofloat]"
     systline = []
