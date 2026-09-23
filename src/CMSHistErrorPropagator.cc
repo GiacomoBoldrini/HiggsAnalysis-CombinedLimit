@@ -59,19 +59,29 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(const char* name,
   funcs_.add(funcs);
   coeffs_.add(coeffs);
 
-  mccorr_.Dump();
+  // mccorr_.Dump() prints every single bin of the correlation histogram --
+  // for a large EFT morphing fit (hundreds of templates x many physical
+  // bins) that's millions of lines. Disabled; replaced with a one-line
+  // summary report below.
+  // mccorr_.Dump();
+  std::cout << "[CMSHistErrorPropagator] correlation histogram: "
+            << hist.GetNbinsX() << " x " << hist.GetNbinsY() << " x "
+            << hist.GetNbinsZ() << " bins" << std::endl;
 
-  // save bin labels as they are not included in the 
+  // save bin labels as they are not included in the
   // FastTemplate3D implementation.. maybe we need a cutom object
 
   unsigned ncf = hist.GetNbinsY();
-  std::cout << "-----" << std::endl;
-  std::cout << "NBins" << ncf <<std::endl;
+  std::cout << "[CMSHistErrorPropagator] reading " << ncf << " correlation sample labels..." << std::endl;
   for (unsigned i = 0; i < ncf; ++i) {
     std::string bin_label = std::string(hist.GetYaxis()->GetBinLabel(i+1));
     corrsamples_[i] = bin_label;
     //auto proc = vfuncs_[i]->getStringAttribute("combine.process");
+    if (ncf >= 20 && (i + 1) % (ncf / 10) == 0) {
+      std::cout << "[CMSHistErrorPropagator] labels: " << (i + 1) << "/" << ncf << std::endl;
+    }
   }
+  std::cout << "[CMSHistErrorPropagator] done reading labels" << std::endl;
   
 }
 
@@ -282,31 +292,39 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 
     // we need to compute c^T sigma c where c is the vector of the coefficients
     // and sigma is the correlation matrix stored at a specific bin 
+    // Only covariance-matrix rows/cols whose sample name is also one of
+    // THIS fit's vfuncs_ have an entry in corrsamples_index_ (see
+    // initialize()) -- for any other row/col, corrsamples_index_[name]
+    // would silently default-construct a bogus index 0 instead of being
+    // skipped. Precomputing which indices are actually active once per
+    // cache update (not per bin -- doesn't depend on bin_idx) both fixes
+    // that and avoids the full mccorr_.binY() x binZ() double loop (e.g.
+    // 406x406) when only a handful of templates (e.g. one EFT operator's
+    // SM + linear + quadratic points) are actually in scope.
+    std::vector<unsigned int> active_corr_idx;
+    active_corr_idx.reserve(corrsamples_index_.size());
+    for (unsigned int k = 0; k < mccorr_.binY(); ++k) {
+      if (corrsamples_index_.count(corrsamples_[k])) {
+        active_corr_idx.push_back(k);
+      }
+    }
+
     for (unsigned int bin_idx = 0; bin_idx < valsum_.size(); ++bin_idx){
       std::vector<double> first_mult(mccorr_.binY(), 0);
       // cycle on correlation matrix bins first in x and then in y
       // make first multiplication
-      for (unsigned int i = 0; i < mccorr_.binY(); ++i){
-        for (unsigned int j = 0; j < mccorr_.binZ(); ++j){
-          // rwo times column product 
-          auto xsample = corrsamples_[i];
-          auto ysample = corrsamples_[j];
-          auto xsidx = corrsamples_index_[xsample]; 
-          auto ysidx = corrsamples_index_[ysample]; 
-
-          // std::cout << xsample << " " << ysample << std::endl;
-          // std::cout << vfuncs_[xsidx]->errors()[bin_idx] << " " << " " <<  vfuncs_[ysidx]->errors()[bin_idx]<< " " << mccorr_.Get(bin_idx, i, j)<< " " << coeffvals_[ysidx] << std::endl;
-          // std::cout << "Factor " << mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx] << std::endl;
+      for (unsigned int i : active_corr_idx){
+        for (unsigned int j : active_corr_idx){
+          auto ysidx = corrsamples_index_[corrsamples_[j]];
           first_mult[i] +=  mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
-          // first_mult[i] +=  vfuncs_[xsidx]->errors()[bin_idx] *   vfuncs_[ysidx]->errors()[bin_idx] * mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
         }
       }
 
       // now make second multiplication and store the result
-      for (unsigned int i = 0; i < mccorr_.binY(); ++i){
+      for (unsigned int i : active_corr_idx){
          err2sumcorr_[bin_idx] += first_mult[i]*coeffvals_[corrsamples_index_[corrsamples_[i]]];
       }
-      
+
     }
     
 // #if HFVERBOSE > 0
@@ -575,45 +593,48 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
 Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs, std::vector<std::string> keep_procs) const{
   double corr_bin_error = 0.;
   std::vector<double> first_mult(mccorr_.binY(), 0);
+
+  // See the identical precomputation in updateCache() -- only these
+  // indices have a valid corrsamples_index_ entry, and restricting the
+  // double loop to them avoids both the full mccorr_.binY() x binZ() scan
+  // and corrsamples_index_[name] silently defaulting to index 0 for a
+  // name outside this fit's vfuncs_.
+  std::vector<unsigned int> active_corr_idx;
+  active_corr_idx.reserve(corrsamples_index_.size());
+  for (unsigned int k = 0; k < mccorr_.binY(); ++k) {
+    if (corrsamples_index_.count(corrsamples_[k])) {
+      active_corr_idx.push_back(k);
+    }
+  }
+
   // cycle on correlation matrix bins first in x and then in y
   // make first multiplication
-  for (unsigned int i = 0; i < mccorr_.binY(); ++i){
-    for (unsigned int j = 0; j < mccorr_.binZ(); ++j){
-      // rwo times column product 
-      auto xsample = corrsamples_[i];
+  for (unsigned int i : active_corr_idx){
+    auto xsample = corrsamples_[i];
+    if (std::find(skipped_procs.begin(), skipped_procs.end(), xsample) != skipped_procs.end()){
+      continue;
+    }
+    for (unsigned int j : active_corr_idx){
       auto ysample = corrsamples_[j];
 
-      if (std::find_if(std::begin(skipped_procs), std::end(skipped_procs), [xsample](const auto& mo) {return mo == xsample; }) != std::end(skipped_procs)){
-        continue;
-      }
-      else if (std::find_if(std::begin(skipped_procs), std::end(skipped_procs), [ysample](const auto& mo) {return mo == ysample; }) != std::end(skipped_procs)){
+      if (std::find(skipped_procs.begin(), skipped_procs.end(), ysample) != skipped_procs.end()){
         continue;
       }
       // case where we need to compute the sum on a sub-matrix of the correlation matrix (e.g. a datacard bin where not all operators are included)
-      // if keep procs is empty then we do not do this 
-
-      if (keep_procs.size() > 0){
-        if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
-          continue;
-        }
-        else if (std::find_if(std::begin(keep_procs), std::end(keep_procs), [ysample](const auto& mo) {return mo == ysample; }) == std::end(keep_procs)){
-          continue;
-        }
+      // if keep procs is empty then we do not do this
+      if (keep_procs.size() > 0 &&
+          std::find(keep_procs.begin(), keep_procs.end(), ysample) == keep_procs.end()){
+        continue;
       }
 
-      auto xsidx = corrsamples_index_[xsample]; 
-      auto ysidx = corrsamples_index_[ysample]; 
+      auto ysidx = corrsamples_index_[ysample];
 
-      // std::cout << xsample << " " << ysample << std::endl;
-      // std::cout << vfuncs_[xsidx]->errors()[bin_idx] << " " << " " <<  vfuncs_[ysidx]->errors()[bin_idx]<< " " << mccorr_.Get(bin_idx, i, j)<< " " << coeffvals_[ysidx] << std::endl;
-      // std::cout << "Factor " << mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx] << std::endl;
       first_mult[i] +=  mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
-      // first_mult[i] +=  vfuncs_[xsidx]->errors()[bin_idx] *   vfuncs_[ysidx]->errors()[bin_idx] * mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
     }
   }
 
   // now make second multiplication and store the result
-  for (unsigned int i = 0; i < mccorr_.binY(); ++i){
+  for (unsigned int i : active_corr_idx){
       corr_bin_error += first_mult[i]*coeffvals_[corrsamples_index_[corrsamples_[i]]];
   }
 
