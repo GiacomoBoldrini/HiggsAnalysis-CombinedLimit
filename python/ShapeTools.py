@@ -115,6 +115,10 @@ class ShapeBuilder(ModelBuilder):
             bbb_args = None
             channelBinParFlag = b in list(self.DC.binParFlags.keys())
             channelCorrBinParFlag = b in list(self.DC.binParFlagsCorr.keys())
+            if channelCorrBinParFlag and not channelBinParFlag:
+                raise RuntimeError("Channel %s has an autoMCCorr line but no autoMCStats line: autoMCCorr needs autoMCStats for the same channel" % b)
+            if channelCorrBinParFlag and self.options.useCMSHistSum:
+                raise RuntimeError("autoMCCorr (channel %s) is only implemented in CMSHistErrorPropagator, do not use --use-histsum" % b)
             if channelBinParFlag:
                 print("Channel %s will use autoMCStats with settings: event-threshold=%g, include-signal=%i, hist-mode=%i" % ((b,) + self.DC.binParFlags[b]))
             for p in self.DC.exp[b].keys():  # so that we get only self.DC.processes contributing to this bin
@@ -190,8 +194,18 @@ class ShapeBuilder(ModelBuilder):
             if channelBinParFlag:
                 args = ("prop_bin%s" % b, "", pdfs.at(0).getXVar(), pdfs, coeffs)
                 # add correlation if present
-                if channelCorrBinParFlag: 
+                if channelCorrBinParFlag:
                     correrlation_matrix = self.getCorrMatrix(b)
+                    # the propagator indexes the TH3 x axis with the channel bin index, without bound checks
+                    nbins_channel = pdfs.at(0).cache().size()
+                    if correrlation_matrix.GetNbinsX() != nbins_channel:
+                        raise RuntimeError(
+                            "autoMCCorr histogram %s for channel %s has %d x bins, but the channel has %d bins"
+                            % (correrlation_matrix.GetName(), b, correrlation_matrix.GetNbinsX(), nbins_channel)
+                        )
+                    if correrlation_matrix.GetNbinsY() != correrlation_matrix.GetNbinsZ():
+                        raise RuntimeError("autoMCCorr histogram %s for channel %s has different y and z binning" % (correrlation_matrix.GetName(), b))
+                    print("Channel %s will use autoMCCorr with %s" % (b, correrlation_matrix.GetName()))
                     args += (correrlation_matrix,)
 
                 if self.options.useCMSHistSum:

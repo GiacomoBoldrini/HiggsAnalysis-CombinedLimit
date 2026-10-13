@@ -626,12 +626,13 @@ def parseCard(file, options):
                 continue
 
             elif pdf == "autoMCCorr":
-                
-                # ['shapes/shapes.root', 'histo_correlation_$CHANNEL']
+                # one TH3 per channel: 'channel autoMCCorr file histo[_$CHANNEL]'
+                # multiple lines accumulate, so each region can point to its own matrix
+                if len(f) != 4:
+                    raise RuntimeError("Syntax for autoMCCorr should be 'channel autoMCCorr file histogram_name'")
                 corr_shape_file = str(f[2])
                 corr_shape_reg = str(f[3])
 
-                ret.binParFlagsCorr = {}
                 statCorr = (corr_shape_file, corr_shape_reg)
 
                 if "*" in lsyst:
@@ -643,10 +644,8 @@ def parseCard(file, options):
                     if lsyst not in ret.bins:
                         raise RuntimeError(" No such channel '%s', malformed line:\n   %s" % (lsyst, " ".join(f)))
                     ret.binParFlagsCorr[lsyst] = statCorr
-
-                print(ret.binParFlagsCorr)
                 continue
-                
+
             else:
                 raise RuntimeError("Unsupported pdf %s" % pdf)
             if len(numbers) < len(ret.keyline):
