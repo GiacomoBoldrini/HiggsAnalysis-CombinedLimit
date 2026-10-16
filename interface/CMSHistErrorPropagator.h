@@ -94,7 +94,11 @@ public:
   // store the RooRealVar corresponding to autoMCstat parameters
   // for BarlowBeeston
   RooListProxy binpars_;
-  mutable FastHisto3D mccorr_; // Need to make this better... why with TH3 it does not work?
+  // Covariance of the correlated samples, one symmetric matrix per bin, restricted to the
+  // samples of this channel and stored as a packed upper triangle: binX = bins,
+  // binY = n(n+1)/2, binZ = 1 (row-major, i <= j). Workspaces written before the packed
+  // storage hold the full matrix (binY = binZ = n), corrAt() reads both.
+  mutable FastHisto3D mccorr_;
   // save the mapping of bin labels to bin number.
   mutable std::map<unsigned int, std::string> corrsamples_;
   mutable std::map<std::string, unsigned int> corrsamples_index_;
@@ -178,6 +182,9 @@ public:
   void updateCache(int eval = 1) const;
 
   Double_t getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs, std::vector<std::string> keep_procs = {}) const;
+
+  // element (i, j) of the covariance matrix in bin bin_idx, i and j index corrsamples_
+  double corrAt(unsigned bin_idx, unsigned i, unsigned j) const;
 
  private:
   ClassDefOverride(CMSHistErrorPropagator,1)

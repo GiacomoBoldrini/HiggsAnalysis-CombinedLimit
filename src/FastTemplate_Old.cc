@@ -293,6 +293,11 @@ void FastHisto3D::NormalizeXSlices() {
 void FastHisto3D::Dump() const {
     printf("--- dumping histo template with %d x %d y %d bins (@%p)---\n", binX_, binY_, binZ_, (void*)(&values_[0]));
     for (unsigned int i = 0; i < size_; ++i) {
+        if (binWidths_.empty()) {  // values-only histogram, no bin edges
+            printf(" bin %3d, ix = %3d, iy = %3d, iz = %3d : zval = %9.5f\n",
+                   i, i/(binY_*binZ_), i%(binY_*binZ_)/binZ_, i%binZ_, values_[i]);
+            continue;
+        }
         printf(" bin %3d, x = %6.2f, y = %6.2f, z = %6.2f : zval = %9.5f, width = %6.3f\n", 
                     i, 0.5*(binEdgesX_[i/(binY_*binZ_)]+binEdgesX_[i/(binY_*binZ_)+1]), 
                        0.5*(binEdgesY_[i%(binY_*binZ_)/binZ_]+binEdgesY_[(i%(binY_*binZ_)/binZ_)+1]),

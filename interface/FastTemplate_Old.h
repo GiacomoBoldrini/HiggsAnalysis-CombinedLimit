@@ -187,6 +187,11 @@ class FastHisto3D : public FastTemplate {
     public:
         FastHisto3D() : FastTemplate(), binX_(0), binY_(0), binZ_(0),binEdgesX_(), binEdgesY_(), binEdgesZ_(), binWidths_() {}
         FastHisto3D(const TH3 &hist, bool normXonly=false) ;
+        /// values only, all zero: no bin edges and no bin widths, so GetAt, IntegralWidth,
+        /// Normalize and NormalizeXSlices must not be used. Fill it through operator[].
+        FastHisto3D(unsigned int binX, unsigned int binY, unsigned int binZ) :
+            FastTemplate(binX*binY*binZ), binX_(binX), binY_(binY), binZ_(binZ),
+            binEdgesX_(), binEdgesY_(), binEdgesZ_(), binWidths_() {}
         FastHisto3D(const FastHisto3D &other) ;
         FastHisto3D & operator=(const FastHisto3D &other) { 
             if (binX() != other.binX() || binY() != other.binY() || binZ() != other.binZ()) {

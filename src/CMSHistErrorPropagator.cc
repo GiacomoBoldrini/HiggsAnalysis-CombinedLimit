@@ -4,6 +4,10 @@
 #include <vector>
 #include <ostream>
 #include <memory>
+#include <set>
+#include <cmath>
+#include <limits>
+#include "TString.h"
 #include "Math/ProbFuncMathCore.h"
 #include "Math/QuantFuncMathCore.h"
 #include "RooRealProxy.h"
@@ -50,7 +54,6 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(const char* name,
       funcs_("funcs", "", this),
       coeffs_("coeffs", "", this),
       binpars_("binpars", "", this),
-      mccorr_(hist),
       sentry_(TString(name) + "_sentry", ""),
       binsentry_(TString(name) + "_binsentry", ""),
       initialized_(false),
@@ -59,30 +62,102 @@ CMSHistErrorPropagator::CMSHistErrorPropagator(const char* name,
   funcs_.add(funcs);
   coeffs_.add(coeffs);
 
-  // mccorr_.Dump() prints every single bin of the correlation histogram --
-  // for a large EFT morphing fit (hundreds of templates x many physical
-  // bins) that's millions of lines. Disabled; replaced with a one-line
-  // summary report below.
-  // mccorr_.Dump();
   std::cout << "[CMSHistErrorPropagator] correlation histogram: "
             << hist.GetNbinsX() << " x " << hist.GetNbinsY() << " x "
             << hist.GetNbinsZ() << " bins" << std::endl;
 
-  // save bin labels as they are not included in the
-  // FastTemplate3D implementation.. maybe we need a cutom object
-
-  unsigned ncf = hist.GetNbinsY();
-  std::cout << "[CMSHistErrorPropagator] reading " << ncf << " correlation sample labels..." << std::endl;
-  for (unsigned i = 0; i < ncf; ++i) {
-    std::string bin_label = std::string(hist.GetYaxis()->GetBinLabel(i+1));
-    corrsamples_[i] = bin_label;
-    //auto proc = vfuncs_[i]->getStringAttribute("combine.process");
-    if (ncf >= 20 && (i + 1) % (ncf / 10) == 0) {
-      std::cout << "[CMSHistErrorPropagator] labels: " << (i + 1) << "/" << ncf << std::endl;
+  // keep only the samples (y = z bin labels) that are processes of this channel: the
+  // others never enter the error computation, and storing the full EFT matrix (e.g.
+  // 406 x 406 per bin) can push the workspace past ROOT's 1 GB buffer limit
+  std::set<std::string> procs;
+  for (int k = 0; k < funcs.getSize(); ++k) {
+    const char* proc = funcs.at(k)->getStringAttribute("combine.process");
+    if (proc) procs.insert(proc);
+  }
+  std::vector<unsigned> keep;  // y (= z) bin indices of the kept samples, in histogram order
+  for (int iy = 0; iy < hist.GetNbinsY(); ++iy) {
+    std::string bin_label = hist.GetYaxis()->GetBinLabel(iy + 1);
+    if (procs.count(bin_label)) {
+      corrsamples_[keep.size()] = bin_label;
+      keep.push_back(iy);
     }
   }
-  std::cout << "[CMSHistErrorPropagator] done reading labels" << std::endl;
-  
+  const unsigned nb = hist.GetNbinsX(), n = keep.size();
+  std::cout << "[CMSHistErrorPropagator] keeping " << n << " of " << hist.GetNbinsY()
+            << " correlation samples (the processes of this channel)" << std::endl;
+  if (n == 0 && hist.GetNbinsY() > 0) {
+    std::cout << "[CMSHistErrorPropagator] WARNING: no correlation sample label matches a process of "
+              << name << ", the correlation histogram is not used" << std::endl;
+  }
+  auto C = [&](unsigned b, unsigned i, unsigned j) { return hist.GetBinContent(b + 1, keep[i] + 1, keep[j] + 1); };
+
+  // The matrix can be given in full, then it must be symmetric, or as one triangle with
+  // the other one all zero. Both are stored as the upper triangle of the symmetric matrix,
+  // so the error computation is the same.
+  bool lower_zero = true, upper_zero = true;
+  double max_asym = 0.;  // max over bins and i < j of |C_ij - C_ji| / sqrt(|C_ii C_jj|)
+  unsigned asym_b = 0, asym_i = 0, asym_j = 0;
+  for (unsigned b = 0; b < nb; ++b) {
+    for (unsigned i = 0; i < n; ++i) {
+      for (unsigned j = i + 1; j < n; ++j) {
+        const double cij = C(b, i, j), cji = C(b, j, i);
+        if (cij != 0.) upper_zero = false;
+        if (cji != 0.) lower_zero = false;
+        const double diff = std::abs(cij - cji);
+        if (diff == 0.) continue;
+        const double scale = std::sqrt(std::abs(C(b, i, i) * C(b, j, j)));
+        const double asym = scale > 0. ? diff / scale : std::numeric_limits<double>::infinity();
+        if (asym > max_asym) {
+          max_asym = asym;
+          asym_b = b;
+          asym_i = i;
+          asym_j = j;
+        }
+      }
+    }
+  }
+  const bool triangular = lower_zero || upper_zero;
+  const double sym_tolerance = 1e-6;
+  if (!triangular && max_asym > sym_tolerance) {
+    throw std::runtime_error(Form(
+        "CMSHistErrorPropagator %s: the correlation histogram %s is neither symmetric nor triangular: "
+        "|C_ij - C_ji| / sqrt(|C_ii C_jj|) = %g > %g in bin %u for samples %s, %s",
+        name, hist.GetName(), max_asym, sym_tolerance, asym_b + 1,
+        corrsamples_[asym_i].c_str(), corrsamples_[asym_j].c_str()));
+  }
+
+  // the symmetric part: exactly C_ij for a symmetric input, C_ij + C_ji (one of them is
+  // zero) for a triangular one
+  FastHisto3D packed(nb, n * (n + 1) / 2, 1);
+  for (unsigned b = 0, k = 0; b < nb; ++b) {
+    for (unsigned i = 0; i < n; ++i) {
+      for (unsigned j = i; j < n; ++j, ++k) {
+        if (i == j) packed[k] = C(b, i, i);
+        else if (triangular) packed[k] = C(b, i, j) + C(b, j, i);
+        else packed[k] = 0.5 * (C(b, i, j) + C(b, j, i));
+      }
+    }
+  }
+  mccorr_.swap(packed);
+
+  if (triangular) {
+    std::cout << "[CMSHistErrorPropagator] correlation matrix given as "
+              << (lower_zero ? "upper" : "lower") << " triangle" << std::endl;
+  } else {
+    std::cout << "[CMSHistErrorPropagator] correlation matrix given in full, max |C_ij - C_ji| / sqrt(|C_ii C_jj|) = "
+              << max_asym << std::endl;
+  }
+  std::cout << "[CMSHistErrorPropagator] stored as packed upper triangle: " << mccorr_.size()
+            << " values (" << mccorr_.size() * sizeof(double) / 1.e6 << " MB)" << std::endl;
+}
+
+double CMSHistErrorPropagator::corrAt(unsigned bin_idx, unsigned i, unsigned j) const {
+  // workspaces written before the packed storage hold the full n x n matrix
+  if (mccorr_.binZ() > 1) return mccorr_.Get(bin_idx, i, j);
+  if (i > j) std::swap(i, j);
+  // row i of the upper triangle starts at i * n - i * (i - 1) / 2
+  const unsigned n = corrsamples_.size();
+  return mccorr_[bin_idx * mccorr_.binY() + i * (2 * n - i + 1) / 2 + (j - i)];
 }
 
 CMSHistErrorPropagator::CMSHistErrorPropagator(
@@ -303,20 +378,20 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
     // SM + linear + quadratic points) are actually in scope.
     std::vector<unsigned int> active_corr_idx;
     active_corr_idx.reserve(corrsamples_index_.size());
-    for (unsigned int k = 0; k < mccorr_.binY(); ++k) {
+    for (unsigned int k = 0; k < corrsamples_.size(); ++k) {
       if (corrsamples_index_.count(corrsamples_[k])) {
         active_corr_idx.push_back(k);
       }
     }
 
     for (unsigned int bin_idx = 0; bin_idx < valsum_.size(); ++bin_idx){
-      std::vector<double> first_mult(mccorr_.binY(), 0);
+      std::vector<double> first_mult(corrsamples_.size(), 0);
       // cycle on correlation matrix bins first in x and then in y
       // make first multiplication
       for (unsigned int i : active_corr_idx){
         for (unsigned int j : active_corr_idx){
           auto ysidx = corrsamples_index_[corrsamples_[j]];
-          first_mult[i] +=  mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
+          first_mult[i] +=  corrAt(bin_idx, i, j) * coeffvals_[ysidx];
         }
       }
 
@@ -404,8 +479,6 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 
 
   if (!binsentry_.good() || eval != last_eval_) {
-    // std::cout << "Run Barlow Beeston" << std::endl;
-    runBarlowBeeston();
     // bintypes might have size == 0 if we never ran setupBinPars()
     // cycle on each template bin
     for (unsigned j = 0; j < bintypes_.size(); ++j) {
@@ -493,13 +566,10 @@ void CMSHistErrorPropagator::updateCache(int eval) const {
 }
 
 void CMSHistErrorPropagator::runBarlowBeeston() const {
-  if (!bb_.init) {
-// #if HFVERBOSE > 0
-//     std::cout << " Skipping runBarlow beeston, bb not initialize" << std::endl;
-// #endif
-    return;
-  }
-  RooAbsArg::setDirtyInhibit(true);
+  if (!bb_.init) return;
+  // CachingAddNLL calls this before evaluating the likelihood (upstream 3956794b): the
+  // yields and errors must be those of the current parameters, not of the previous call
+  updateCache();
 
   const unsigned n = bb_.use.size();
   // std::cout << "n: " << n << std::endl;
@@ -522,10 +592,6 @@ void CMSHistErrorPropagator::runBarlowBeeston() const {
   for (unsigned j = 0; j < n; ++j) {
     if (toterr_[bb_.use[j]] > 0.) bb_.push_res[j]->setVal(bb_.res[j]);
   }
-  RooAbsArg::setDirtyInhibit(false);
-  for (RooAbsArg *arg : bb_.dirty_prop) {
-    arg->setValueDirty();
-  }
 }
 
 void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
@@ -547,7 +613,6 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
     bb_.x2.clear();
     bb_.res.clear();
     bb_.gobs.clear();
-    bb_.dirty_prop.clear();
     bb_.push_res.clear();
     bb_.init = false;
   }
@@ -561,7 +626,6 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
             //std::cout << "Skipping " << this << " " << this->GetName() << "\n";
           } else {
             //std::cout << "Adding " << arg << " " << arg->GetName() << "\n";
-            bb_.dirty_prop.insert(arg);
             auto as_gauss = dynamic_cast<RooGaussian*>(arg);
             if (as_gauss) {
               auto gobs = dynamic_cast<RooAbsReal*>(as_gauss->findServer(TString(vbinpars_[j][0]->GetName())+"_In"));
@@ -592,7 +656,7 @@ void CMSHistErrorPropagator::setAnalyticBarlowBeeston(bool flag) const {
 // binidx is the bin number
 Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<std::string> skipped_procs, std::vector<std::string> keep_procs) const{
   double corr_bin_error = 0.;
-  std::vector<double> first_mult(mccorr_.binY(), 0);
+  std::vector<double> first_mult(corrsamples_.size(), 0);
 
   // See the identical precomputation in updateCache() -- only these
   // indices have a valid corrsamples_index_ entry, and restricting the
@@ -601,7 +665,7 @@ Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<s
   // name outside this fit's vfuncs_.
   std::vector<unsigned int> active_corr_idx;
   active_corr_idx.reserve(corrsamples_index_.size());
-  for (unsigned int k = 0; k < mccorr_.binY(); ++k) {
+  for (unsigned int k = 0; k < corrsamples_.size(); ++k) {
     if (corrsamples_index_.count(corrsamples_[k])) {
       active_corr_idx.push_back(k);
     }
@@ -629,7 +693,7 @@ Double_t CMSHistErrorPropagator::getBinCorrError(unsigned bin_idx, std::vector<s
 
       auto ysidx = corrsamples_index_[ysample];
 
-      first_mult[i] +=  mccorr_.Get(bin_idx, i, j) * coeffvals_[ysidx];
+      first_mult[i] +=  corrAt(bin_idx, i, j) * coeffvals_[ysidx];
     }
   }
 
