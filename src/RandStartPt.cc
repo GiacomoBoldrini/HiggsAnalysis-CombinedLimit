@@ -148,8 +148,9 @@ void RandStartPt::setValSpecifiedObjs(){
     }
 }
 
-void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, CascadeMinimizer &minimObj){
+bool RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, CascadeMinimizer &minimObj){
     float current_best_nll = 0;
+    bool any_ok = false;
     //the nested vector to hold random starting points to try
     std::vector<std::vector<float>> nested_vector_of_wc_vals =  vectorOfPointsToTry ();
     for (unsigned int start_pt_idx = 0; start_pt_idx<nested_vector_of_wc_vals.size(); start_pt_idx++){
@@ -179,8 +180,10 @@ void RandStartPt::doRandomStartPt1DGridScan(double &xval, unsigned int poiSize, 
              setValSpecifiedObjs();
              //finally, commit best NLL value
              commitBestNLLVal(start_pt_idx, current_best_nll, prob);
+             any_ok = true;
          }
     }
+    return any_ok;
 }
 
 void RandStartPt::doRandomStartPt2DGridScan(double &xval, double &yval, unsigned int poiSize, std::vector<float> &poival, std::vector<RooRealVar* > &poivars, std::unique_ptr <RooArgSet> &param, RooArgSet &snap, float &deltaNLL, double &nll_init, MultiDimFit::GridType gridType, double deltaX, double deltaY, CascadeMinimizer &minimObj){
