@@ -1,5 +1,6 @@
 #include "../interface/MultiDimFit.h"
 #include <stdexcept>
+#include <algorithm>
 #include <cmath>
 
 #include "TMath.h"
@@ -667,16 +668,33 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
           lastPoint_ = points - 1;
         }
 
-        for (unsigned int i = 0; i < points; ++i) {
-          if (i < firstPoint_) continue;
-          if (i > lastPoint_)  break;
+        // --X-rtd MULTIDIMFIT_GRID_CONTINUATION: visit the points outward from the best fit
+        // (downward from it, then upward) and start each one from the minimum of the
+        // previous point when that one converged, instead of from the initial snapshot.
+        // Points far from the best fit then start next to a converged neighbour.
+        static const bool gridContinuation = runtimedef::get(std::string("MULTIDIMFIT_GRID_CONTINUATION"));
+        std::vector<unsigned int> order, upward;
+        for (unsigned int i = firstPoint_; i < points && i <= lastPoint_; ++i) {
+          if (gridContinuation && (i + xspacingOffset) > xbestpoint) upward.push_back(i);
+          else order.push_back(i);
+        }
+        const size_t nDownward = order.size();
+        if (gridContinuation) {
+          std::reverse(order.begin(), order.end());
+          order.insert(order.end(), upward.begin(), upward.end());
+        }
+        std::unique_ptr<RooArgSet> prevMin;
+
+        for (size_t ip = 0; ip < order.size(); ++ip) {
+          const unsigned int i = order[ip];
+          if (gridContinuation && ip == nDownward) prevMin.reset();  // the upward sweep starts again from the best fit
           double x = pmin[0] + (i + xspacingOffset) * xspacing;
           // If we're aligning with the edges and this is the last point,
           // set x to pmax[0] exactly
           if (alignEdges_ && i == (points - 1)) {
             x = pmax[0];
           }
-          if (xbestpoint > lastPoint_) {
+          if (!gridContinuation && xbestpoint > lastPoint_) {
             int ireverse = lastPoint_ - i + firstPoint_;
             x = pmin[0] + (ireverse + xspacingOffset) * xspacing;
           }
@@ -722,7 +740,12 @@ void MultiDimFit::doGrid(RooWorkspace *w, RooAbsReal &nll)
 		    specifiedCat_,
 		    specifiedCatVals_,
 		    nOtherFloatingPoi_);
-            randStartPt.doRandomStartPt1DGridScan(x, n, poiVals_, poiVars_, params, snap, deltaNLL_, nll0, minim);
+            RooArgSet &start = (gridContinuation && prevMin) ? *prevMin : snap;
+            const bool converged = randStartPt.doRandomStartPt1DGridScan(x, n, poiVals_, poiVars_, params, start, deltaNLL_, nll0, minim);
+            if (gridContinuation) {
+              if (converged) prevMin.reset(static_cast<RooArgSet *>(params->snapshot()));
+              else prevMin.reset();
+            }
 
         } // End of the loop over scan points
     } else if (n == 2) {
